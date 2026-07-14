@@ -2,15 +2,15 @@ import { getKnives } from "@/lib/data";
 import { getCurrentWorker } from "@/lib/session";
 import { effectiveRoles } from "@/lib/status";
 import KnifeBoard, { type KnifeDTO } from "@/components/KnifeBoard";
-import { PinPad } from "@/components/SessionControls";
 import { Legend } from "@/components/Legend";
 
 // Always render fresh — this is a live shared board.
 export const dynamic = "force-dynamic";
 
+// The (gated) layout guarantees a signed-in worker before this renders.
 export default async function DashboardPage() {
   const [knives, worker] = await Promise.all([getKnives(), getCurrentWorker()]);
-  const roles = worker ? effectiveRoles(worker.roles) : [];
+  const roles = effectiveRoles(worker?.roles ?? "");
 
   const dto: KnifeDTO[] = knives.map((k) => ({
     id: k.id,
@@ -30,15 +30,9 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <KnifeBoard knives={dto} roles={roles} signedIn={!!worker} />
+      <KnifeBoard knives={dto} roles={roles} signedIn={true} />
 
       <Legend />
-
-      {!worker && (
-        <div className="pt-4">
-          <PinPad />
-        </div>
-      )}
     </div>
   );
 }

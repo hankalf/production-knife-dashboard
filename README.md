@@ -36,10 +36,14 @@ right person.
 
 ## Access & the admin panel
 
-- The **admin panel** (`/admin`) is limited to **admins and QA**. Opening it prompts for a PIN;
-  operators/sanitation are shown an access-denied message.
-- Floor actions on the main board and kiosk are gated by role — each person only sees the
-  actions they're allowed to take.
+- The whole app **except the kiosk** is gated: visiting the board, reports, or a knife's
+  history shows a **full-screen PIN sign-in** first — nothing is viewable until you enter a
+  valid PIN. The **`/kiosk`** wall display stays open (no sign-in) so a shared screen can
+  always show status.
+- The **admin panel** (`/admin`) is limited to **admins and QA**, and requires its own PIN
+  entry each visit (a short re-auth) even if you're already signed in on the board.
+- Floor actions on the board and kiosk are gated by role — each person only sees the actions
+  they're allowed to take.
 
 ## Screens
 
