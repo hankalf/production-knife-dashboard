@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentWorker } from "@/lib/session";
+import { getCurrentWorker, getAdminGateWorkerId } from "@/lib/session";
 import { canAccessAdmin } from "@/lib/status";
 import {
   getWorkers,
@@ -10,15 +10,17 @@ import {
 } from "@/lib/data";
 import { ACTION_LABEL } from "@/lib/status";
 import { AdminPanel } from "@/components/AdminPanel";
-import { PinPad } from "@/components/SessionControls";
+import { AdminGatePad } from "@/components/SessionControls";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const worker = await getCurrentWorker();
+  const [worker, gateId] = await Promise.all([getCurrentWorker(), getAdminGateWorkerId()]);
+  const unlocked = !!worker && gateId === worker.id && canAccessAdmin(worker.roles);
 
-  // Not signed in → show the PIN prompt right here to verify access level.
-  if (!worker) {
+  // Always require a fresh PIN on the admin page before revealing the dashboard,
+  // even if the worker is already signed in on the board.
+  if (!unlocked) {
     return (
       <div className="max-w-md mx-auto py-10 space-y-6">
         <div className="text-center">
@@ -27,27 +29,12 @@ export default async function AdminPage() {
             Enter your PIN to continue. Only admins and QA can open this panel.
           </p>
         </div>
-        <PinPad />
+        <AdminGatePad />
         <div className="text-center">
           <Link href="/" className="text-sky-700 underline text-sm">
             ← Back to fleet
           </Link>
         </div>
-      </div>
-    );
-  }
-
-  // Signed in but not permitted → access denied.
-  if (!canAccessAdmin(worker.roles)) {
-    return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <h1 className="text-xl font-bold mb-2">No access</h1>
-        <p className="text-slate-500 mb-4">
-          The admin panel is limited to admins and QA. You&apos;re signed in as {worker.name}.
-        </p>
-        <Link href="/" className="text-sky-700 underline">
-          ← Back to fleet
-        </Link>
       </div>
     );
   }

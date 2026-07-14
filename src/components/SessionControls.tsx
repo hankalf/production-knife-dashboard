@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { login, logout } from "@/app/actions";
+import { login, logout, unlockAdmin, type ActionResult } from "@/app/actions";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -18,7 +18,18 @@ export function LogoutButton() {
   );
 }
 
-export function PinPad() {
+// Shared numeric keypad. `verify` runs the PIN against a server action.
+function Keypad({
+  title,
+  subtitle,
+  submitLabel,
+  verify,
+}: {
+  title: string;
+  subtitle: string;
+  submitLabel: string;
+  verify: (pin: string) => Promise<ActionResult>;
+}) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +42,12 @@ export function PinPad() {
   function submit() {
     setError(null);
     start(async () => {
-      const res = await login(pin);
+      const res = await verify(pin);
       if (res.ok) {
         setPin("");
         router.refresh();
       } else {
-        setError(res.error ?? "Sign in failed.");
+        setError(res.error ?? "Failed.");
         setPin("");
       }
     });
@@ -46,12 +57,12 @@ export function PinPad() {
 
   return (
     <div className="mx-auto max-w-xs w-full bg-white rounded-2xl shadow p-6">
-      <h2 className="text-center text-lg font-semibold mb-1">Enter your PIN</h2>
-      <p className="text-center text-xs text-slate-500 mb-4">
-        Your role unlocks the actions you can take.
-      </p>
+      <h2 className="text-center text-lg font-semibold mb-1">{title}</h2>
+      <p className="text-center text-xs text-slate-500 mb-4">{subtitle}</p>
       <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
-        {pin.replace(/./g, "•") || <span className="text-slate-300 tracking-normal text-base">••••</span>}
+        {pin.replace(/./g, "•") || (
+          <span className="text-slate-300 tracking-normal text-base">••••</span>
+        )}
       </div>
       {error && (
         <p className="text-center text-sm text-red-600 mb-3" role="alert">
@@ -86,9 +97,33 @@ export function PinPad() {
           disabled={pending || pin.length === 0}
           className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
         >
-          {pending ? "…" : "Enter"}
+          {pending ? "…" : submitLabel}
         </button>
       </div>
     </div>
+  );
+}
+
+// Board sign-in.
+export function PinPad() {
+  return (
+    <Keypad
+      title="Enter your PIN"
+      subtitle="Your role unlocks the actions you can take."
+      submitLabel="Enter"
+      verify={login}
+    />
+  );
+}
+
+// Admin dashboard gate — always shown before the panel.
+export function AdminGatePad() {
+  return (
+    <Keypad
+      title="Admin access"
+      subtitle="Enter your admin or QA PIN to open the dashboard."
+      submitLabel="Unlock"
+      verify={unlockAdmin}
+    />
   );
 }
