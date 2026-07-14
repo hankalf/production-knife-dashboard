@@ -167,6 +167,39 @@ async function kioskOpts(action: "CHECKOUT" | "RETURN" | "CLEAN", actor: Actor):
   };
 }
 
+// ---- Kiosk lock (supervisor view-only toggle) -----------------------------
+
+async function writeKioskLocked(locked: boolean): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: "kioskLocked" },
+    update: { value: String(locked) },
+    create: { key: "kioskLocked", value: String(locked) },
+  });
+  revalidatePath("/", "layout");
+}
+
+// From the Admin panel (signed-in admin).
+export async function setKioskLocked(locked: boolean): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  if (!auth.ok) return fail(auth.error);
+  await writeKioskLocked(locked);
+  return ok();
+}
+
+// From the kiosk itself — a supervisor confirms with their admin PIN.
+export async function setKioskLockedWithPin(
+  locked: boolean,
+  pin: string
+): Promise<ActionResult> {
+  const actor = await actorFromPin(pin);
+  if (!actor) return fail("PIN not recognized.");
+  if (!hasRole(actor.roles, ROLE.ADMIN)) {
+    return fail("Only an admin can lock or unlock the kiosk.");
+  }
+  await writeKioskLocked(locked);
+  return ok();
+}
+
 // Kiosk action: identify by PIN, then run the transition. Operators can
 // check out / check in; sanitation can clean. QA/admin use the main board.
 export async function kioskAct(
@@ -174,6 +207,10 @@ export async function kioskAct(
   action: "CHECKOUT" | "RETURN" | "CLEAN",
   pin: string
 ): Promise<ActionResult> {
+  // Respect the supervisor lock even if a client bypasses the disabled UI.
+  const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
+  if (locked?.value === "true") return fail("The kiosk is locked. Ask a supervisor to unlock it.");
+
   const actor = await actorFromPin(pin);
   if (!actor) return fail("PIN not recognized.");
   const opts = await kioskOpts(action, actor);
