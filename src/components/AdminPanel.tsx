@@ -122,12 +122,13 @@ function Msg({ msg }: { msg: { ok: boolean; text: string } | null }) {
 function AddKnifeCard() {
   const { pending, msg, run } = useRun();
   const [number, setNumber] = useState("");
+  const [type, setType] = useState<"FC" | "NFC">("FC");
   return (
     <Card title="Add a knife">
       <p className="text-sm text-slate-500 mb-3">
         New knives enter the fleet as Available.
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-2 mb-2">
         <input
           value={number}
           onChange={(e) => setNumber(e.target.value)}
@@ -136,12 +137,30 @@ function AddKnifeCard() {
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
         />
         <button
-          onClick={() => run(() => addKnife(number), `Knife #${number} added.`)}
+          onClick={() => run(() => addKnife(number, type), `Knife #${number} added.`)}
           disabled={pending}
           className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 disabled:opacity-50"
         >
           Add
         </button>
+      </div>
+      <div className="flex gap-2">
+        {(["FC", "NFC"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setType(t)}
+            className={`flex-1 rounded-lg py-1.5 text-sm font-medium border ${
+              type === t
+                ? t === "FC"
+                  ? "bg-blue-600 text-white border-transparent"
+                  : "bg-slate-300 text-slate-800 border-transparent"
+                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {t === "FC" ? "Food Contact" : "Non-Food Contact"}
+          </button>
+        ))}
       </div>
       <Msg msg={msg} />
     </Card>

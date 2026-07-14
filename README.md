@@ -19,7 +19,14 @@ AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)�
 ```
 
 - **Overdue** is derived (a checked-out knife past its due time), shown in red with a banner.
-- **Out of service** — admins can retire damaged/lost knives and restore them later.
+- **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
+
+### Knife type
+
+Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**, shown as a corner badge on
+every tile — **blue FC**, **silver NFC** — on both the board and the kiosk (the tile fill still
+shows lifecycle status). Set the type when adding a knife, or change it later from the knife's
+action modal (admin/QA). New knives default to FC.
 
 ## Roles (identified by PIN)
 

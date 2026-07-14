@@ -390,12 +390,13 @@ export async function restoreKnife(knifeId: number): Promise<ActionResult> {
 
 // ---- Admin: fleet & workers ----------------------------------------------
 
-export async function addKnife(number: string): Promise<ActionResult> {
+export async function addKnife(number: string, type: string = "FC"): Promise<ActionResult> {
   const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   const label = (number || "").trim();
   if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
   const sortKey = Number(label);
+  const knifeType = type === "NFC" ? "NFC" : "FC";
 
   const existing = await prisma.knife.findUnique({ where: { number: label } });
   if (existing) return fail(`Knife #${label} already exists.`);
@@ -403,7 +404,7 @@ export async function addKnife(number: string): Promise<ActionResult> {
   try {
     await prisma.$transaction(async (tx) => {
       const knife = await tx.knife.create({
-        data: { number: label, sortKey, status: STATUS.AVAILABLE },
+        data: { number: label, sortKey, status: STATUS.AVAILABLE, type: knifeType },
       });
       await tx.knifeEvent.create({
         data: {
@@ -412,12 +413,40 @@ export async function addKnife(number: string): Promise<ActionResult> {
           action: "ADD",
           fromStatus: null,
           toStatus: STATUS.AVAILABLE,
-          note: "Added to fleet",
+          note: `Added to fleet (${knifeType})`,
         },
       });
     });
   } catch {
     return fail("Could not add knife.");
+  }
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+export async function setKnifeType(knifeId: number, type: string): Promise<ActionResult> {
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  const knifeType = type === "NFC" ? "NFC" : "FC";
+  try {
+    await prisma.$transaction(async (tx) => {
+      const knife = await tx.knife.findUnique({ where: { id: knifeId } });
+      if (!knife) throw new Error("Knife not found.");
+      if (knife.type === knifeType) return;
+      await tx.knife.update({ where: { id: knifeId }, data: { type: knifeType } });
+      await tx.knifeEvent.create({
+        data: {
+          knifeId,
+          workerId: auth.workerId,
+          action: "RETYPE",
+          fromStatus: knife.status,
+          toStatus: knife.status,
+          note: `Type set to ${knifeType}`,
+        },
+      });
+    });
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : "Could not update type.");
   }
   revalidatePath("/", "layout");
   return ok();

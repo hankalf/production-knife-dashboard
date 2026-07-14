@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getKnifeByNumber } from "@/lib/data";
-import { STATUS_META, ACTION_LABEL, displayState } from "@/lib/status";
+import { STATUS_META, ACTION_LABEL, displayState, TYPE_META, normalizeType } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,14 @@ export default async function KnifeDetailPage({
 
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Knife #{knife.number}</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            Knife #{knife.number}
+            <span
+              className={`rounded px-2 py-0.5 text-xs font-bold ${TYPE_META[normalizeType(knife.type)].badge}`}
+            >
+              {TYPE_META[normalizeType(knife.type)].short}
+            </span>
+          </h1>
           <div className="flex items-center gap-2">
             <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[state].dot}`} />
             <span className="font-medium">{STATUS_META[state].label}</span>

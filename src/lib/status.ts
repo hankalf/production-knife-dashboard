@@ -10,6 +10,33 @@ export const STATUS = {
 
 export type Status = (typeof STATUS)[keyof typeof STATUS];
 
+// Knife type — whether the blade touches food.
+export const KNIFE_TYPE = {
+  FC: "FC", // Food Contact
+  NFC: "NFC", // Non-Food Contact
+} as const;
+
+export type KnifeType = (typeof KNIFE_TYPE)[keyof typeof KNIFE_TYPE];
+
+export const TYPE_META: Record<KnifeType, { label: string; short: string; badge: string; dot: string }> = {
+  FC: {
+    label: "Food Contact",
+    short: "FC",
+    badge: "bg-blue-600 text-white",
+    dot: "bg-blue-600",
+  },
+  NFC: {
+    label: "Non-Food Contact",
+    short: "NFC",
+    badge: "bg-slate-300 text-slate-800",
+    dot: "bg-slate-300 border border-slate-400",
+  },
+};
+
+export function normalizeType(type: string): KnifeType {
+  return type === "NFC" ? "NFC" : "FC";
+}
+
 export const ROLE = {
   OPERATOR: "OPERATOR",
   SANITATION: "SANITATION",
@@ -123,4 +150,5 @@ export const ACTION_LABEL: Record<string, string> = {
   RETIRE: "Retired",
   RESTORE: "Restored",
   ADD: "Added to fleet",
+  RETYPE: "Type changed",
 };

@@ -11,6 +11,7 @@ export default async function KioskPage() {
     id: k.id,
     number: k.number,
     status: k.status,
+    type: k.type,
     dueAtMs: k.dueAt ? k.dueAt.getTime() : null,
   }));
   return <KioskBoard knives={dto} locked={locked} />;

@@ -13,6 +13,7 @@ model Knife {
   number   String @unique // printed label, e.g. "53"
   sortKey  Int    // numeric value of `number` for stable ordering
   status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DIRTY | CLEANED | OUT_OF_SERVICE
+  type     String @default("FC") // FC (Food Contact) | NFC (Non-Food Contact)
   scanCode String? @unique // reserved for future QR/barcode support
 
   // current-cycle fields (cleared when the knife returns to AVAILABLE)

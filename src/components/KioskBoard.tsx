@@ -3,13 +3,20 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { STATUS_META, DISPLAY_ORDER, type DisplayState } from "@/lib/status";
+import {
+  STATUS_META,
+  DISPLAY_ORDER,
+  TYPE_META,
+  normalizeType,
+  type DisplayState,
+} from "@/lib/status";
 import { kioskAct, setKioskLockedWithPin } from "@/app/actions";
 
 export type KioskKnife = {
   id: number;
   number: string;
   status: string;
+  type: string;
   dueAtMs: number | null;
 };
 
@@ -125,17 +132,22 @@ export default function KioskBoard({
         </div>
       )}
 
-      {/* Large grid */}
-      <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3 content-start">
+      {/* Grid — one numbered group per row (1–14, 51–64, 65–78) */}
+      <div className="grid grid-cols-7 gap-2 md:grid-cols-[repeat(14,minmax(0,1fr))] content-start">
         {withState.map(({ k, state }) => (
           <button
             key={k.id}
             onClick={() => !locked && setSelectedId(k.id)}
-            className={`aspect-square rounded-2xl border-2 flex items-center justify-center text-2xl font-bold transition ${
+            className={`relative aspect-square rounded-xl border-2 flex items-center justify-center text-sm sm:text-base md:text-lg font-bold transition ${
               STATUS_META[state].tile
             } ${locked ? "cursor-default" : ""}`}
-            title={`#${k.number} — ${STATUS_META[state].label}`}
+            title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
           >
+            <span
+              className={`absolute top-0.5 left-0.5 rounded px-1 leading-tight text-[9px] sm:text-[10px] font-bold ${TYPE_META[normalizeType(k.type)].badge}`}
+            >
+              {TYPE_META[normalizeType(k.type)].short}
+            </span>
             #{k.number}
           </button>
         ))}
