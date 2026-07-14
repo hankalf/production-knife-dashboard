@@ -87,6 +87,32 @@ Point tablets/desktops at `http://<that-machine>:3000`. Keeps working without in
 keeps data on-site, and the whole database is one file (`prisma/dev.db`) that's trivial to
 back up nightly.
 
+## Deploy a test on Railway
+
+Railway gives you a public URL you can open on any device (including a floor tablet).
+The repo is already set up for it (`railway.json` + a `start:prod` script that creates the
+schema and seeds the fleet on boot).
+
+1. Push this branch to GitHub (already done).
+2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** →
+   pick `production-knife-dashboard` and the `claude/safety-knife-checkout-system-999z8h` branch.
+3. Railway auto-detects Next.js, runs `npm run build`, then `npm run start:prod`. When the deploy
+   finishes, open **Settings → Networking → Generate Domain** to get your public URL.
+4. Sign in with the default PINs (Admin `0000`, Operator `1111`, Sanitation `2222`, QA `3333`).
+
+**Data persistence (optional but recommended).** This app uses a single SQLite file. Without a
+volume, Railway's disk is ephemeral, so your test data resets on each redeploy (the fleet is
+re-seeded on every boot, so the app still works fine — you just lose in-progress checkouts).
+To keep data across deploys:
+
+- Add a **Volume** to the service, mounted at `/data`.
+- Set an environment variable `DATABASE_URL=file:/data/prod.db`.
+
+That's it — the seed is idempotent, so redeploys won't duplicate knives or workers.
+
+> For a permanent multi-user production install, prefer Postgres (Railway one-click) over
+> SQLite; ask and I'll switch the Prisma datasource and add migrations.
+
 ## Audit log
 
 Every transition writes an immutable `KnifeEvent` (knife, action, from/to status, worker,

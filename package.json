@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "start:prod": "prisma db push --skip-generate && tsx prisma/seed.ts && next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
@@ -18,8 +19,10 @@
   "dependencies": {
     "@prisma/client": "^6.3.0",
     "next": "15.1.6",
+    "prisma": "^6.3.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -27,9 +30,7 @@
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "prisma": "^6.3.0",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
