@@ -42,15 +42,17 @@ export async function logout(): Promise<ActionResult> {
 // ---- Shared transition core ----------------------------------------------
 
 async function requireWorkerWithRole(role: Role): Promise<
-  { ok: true; workerId: number } | { ok: false; error: string }
+  { ok: true; workerId: number; roles: string } | { ok: false; error: string }
 > {
   const worker = await getCurrentWorker();
   if (!worker) return { ok: false, error: "Sign in with your PIN first." };
   if (!hasRole(worker.roles, role)) {
     return { ok: false, error: `This action requires the ${role} role.` };
   }
-  return { ok: true, workerId: worker.id };
+  return { ok: true, workerId: worker.id, roles: worker.roles };
 }
+
+type GuardContext = { workerId: number; roles: string };
 
 type TransitionOpts = {
   action: string;
@@ -60,6 +62,11 @@ type TransitionOpts = {
   note?: string;
   // extra data to write onto the knife
   data?: Record<string, unknown>;
+  // optional extra check (e.g. "only the operator who checked it out may return it")
+  guard?: (
+    knife: { checkedOutById: number | null; number: string },
+    ctx: GuardContext
+  ) => string | null;
 };
 
 async function transition(knifeId: number, opts: TransitionOpts): Promise<ActionResult> {
@@ -74,6 +81,10 @@ async function transition(knifeId: number, opts: TransitionOpts): Promise<Action
         throw new Error(
           `Knife #${knife.number} is "${knife.status}" and cannot be ${opts.action}.`
         );
+      }
+      if (opts.guard) {
+        const err = opts.guard(knife, { workerId: auth.workerId, roles: auth.roles });
+        if (err) throw new Error(err);
       }
       await tx.knife.update({
         where: { id: knifeId },
@@ -122,6 +133,11 @@ export async function returnKnife(knifeId: number): Promise<ActionResult> {
     to: STATUS.DIRTY,
     role: ROLE.OPERATOR,
     data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
+    // Only the operator who holds the knife may return it (admins can override).
+    guard: (knife, ctx) =>
+      knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
+        ? null
+        : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
   });
 }
 
@@ -154,6 +170,36 @@ export async function qaFailKnife(knifeId: number, reason: string): Promise<Acti
     role: ROLE.QA,
     note,
   });
+}
+
+// ---- Batch actions (sanitation / QA move many knives at once) --------------
+
+export type BatchResult = { ok: boolean; done: number; failed: number; error?: string };
+
+async function runBatch(
+  ids: number[],
+  fn: (id: number) => Promise<ActionResult>
+): Promise<BatchResult> {
+  let done = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+  for (const id of ids) {
+    const res = await fn(id);
+    if (res.ok) done++;
+    else {
+      failed++;
+      if (!firstError) firstError = res.error;
+    }
+  }
+  return { ok: done > 0, done, failed, error: failed > 0 ? firstError : undefined };
+}
+
+export async function batchClean(ids: number[]): Promise<BatchResult> {
+  return runBatch(ids, cleanKnife);
+}
+
+export async function batchQaPass(ids: number[]): Promise<BatchResult> {
+  return runBatch(ids, qaPassKnife);
 }
 
 export async function retireKnife(knifeId: number, reason: string): Promise<ActionResult> {

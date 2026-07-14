@@ -35,13 +35,20 @@ export default async function RootLayout({
                 <span>Safety Knife Checkout</span>
               </Link>
               <div className="flex items-center gap-3 text-sm">
+                <Link
+                  href="/kiosk"
+                  className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5 hidden sm:inline"
+                >
+                  Kiosk
+                </Link>
                 {worker ? (
                   <>
-                    <span className="hidden sm:inline text-slate-300">Signed in as</span>
-                    <span className="font-medium">{worker.name}</span>
-                    <span className="text-slate-400 hidden sm:inline">
-                      ({roles.join(", ")})
-                    </span>
+                    <Link
+                      href="/reports"
+                      className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5"
+                    >
+                      Reports
+                    </Link>
                     {roles.includes("ADMIN") && (
                       <Link
                         href="/admin"
@@ -50,6 +57,8 @@ export default async function RootLayout({
                         Admin
                       </Link>
                     )}
+                    <span className="hidden md:inline text-slate-300">Signed in as</span>
+                    <span className="font-medium">{worker.name}</span>
                     <LogoutButton />
                   </>
                 ) : (

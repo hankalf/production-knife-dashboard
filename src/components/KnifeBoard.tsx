@@ -16,7 +16,10 @@ import {
   qaFailKnife,
   retireKnife,
   restoreKnife,
+  batchClean,
+  batchQaPass,
   type ActionResult,
+  type BatchResult,
 } from "@/app/actions";
 
 export type KnifeDTO = {
@@ -57,6 +60,47 @@ export default function KnifeBoard({
   const [now, setNow] = useState<number>(() => 0);
   const [filter, setFilter] = useState<DisplayState | "ALL">("ALL");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [batchPending, startBatch] = useTransition();
+
+  // Which batch action, if any, the current worker can run in the current filter.
+  const batchOption = useMemo(() => {
+    if (filter === "DIRTY" && roles.includes("SANITATION"))
+      return { status: "DIRTY", label: "Mark cleaned", fn: batchClean };
+    if (filter === "CLEANED" && roles.includes("QA"))
+      return { status: "CLEANED", label: "Pass QA", fn: batchQaPass };
+    return null;
+  }, [filter, roles]);
+
+  // Leaving a batch-eligible filter cancels batch mode.
+  useEffect(() => {
+    if (!batchOption && batchMode) {
+      setBatchMode(false);
+      setPicked(new Set());
+    }
+  }, [batchOption, batchMode]);
+
+  function togglePicked(id: number) {
+    setPicked((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function runBatch() {
+    if (!batchOption || picked.size === 0) return;
+    const ids = [...picked];
+    startBatch(async () => {
+      const res: BatchResult = await batchOption.fn(ids);
+      setBatchMode(false);
+      setPicked(new Set());
+      router.refresh();
+      void res;
+    });
+  }
 
   useEffect(() => {
     setNow(Date.now());
@@ -131,24 +175,84 @@ export default function KnifeBoard({
         </p>
       )}
 
+      {/* Batch toolbar — only when the worker can act on the filtered state */}
+      {batchOption && (
+        <div className="mb-3">
+          {!batchMode ? (
+            <button
+              onClick={() => setBatchMode(true)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              ☑︎ Select multiple to {batchOption.label.toLowerCase()}
+            </button>
+          ) : (
+            <p className="text-sm text-slate-600">
+              Tap the knives to {batchOption.label.toLowerCase()}, then confirm below.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Grid */}
       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-        {visible.map(({ k, state }) => (
-          <button
-            key={k.id}
-            onClick={() => setSelectedId(k.id)}
-            className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center font-bold text-lg transition ${STATUS_META[state].tile}`}
-            title={`Knife #${k.number} — ${STATUS_META[state].label}`}
-          >
-            <span>#{k.number}</span>
-          </button>
-        ))}
+        {visible.map(({ k, state }) => {
+          const eligible = batchMode && batchOption && k.status === batchOption.status;
+          const isPicked = picked.has(k.id);
+          return (
+            <button
+              key={k.id}
+              onClick={() =>
+                eligible ? togglePicked(k.id) : batchMode ? undefined : setSelectedId(k.id)
+              }
+              className={`relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center font-bold text-lg transition ${
+                STATUS_META[state].tile
+              } ${batchMode && !eligible ? "opacity-40" : ""} ${
+                isPicked ? "ring-4 ring-offset-2 ring-slate-900" : ""
+              }`}
+              title={`Knife #${k.number} — ${STATUS_META[state].label}`}
+            >
+              <span>#{k.number}</span>
+              {isPicked && (
+                <span className="absolute top-1 right-1 bg-white text-slate-900 rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                  ✓
+                </span>
+              )}
+            </button>
+          );
+        })}
         {visible.length === 0 && (
           <p className="col-span-full text-center text-slate-400 py-8">
             No knives in this state.
           </p>
         )}
       </div>
+
+      {/* Sticky batch action bar */}
+      {batchMode && batchOption && (
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-lg px-4 py-3">
+          <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-600">{picked.size} selected</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setBatchMode(false);
+                  setPicked(new Set());
+                }}
+                className="rounded-lg px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={runBatch}
+                disabled={batchPending || picked.size === 0}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {batchPending ? "Working…" : `${batchOption.label} (${picked.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail / action modal */}
       {selected && selectedState && (

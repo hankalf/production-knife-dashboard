@@ -25,12 +25,24 @@ AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)�
 
 | Role | Can do |
 |------|--------|
-| Operator | Check out an available knife; return it after use |
-| Sanitation | Mark a used (dirty) knife cleaned |
-| QA | Pass a cleaned knife back into service, or fail it (with a reason) back to sanitation |
-| Admin | Add knives, retire/restore, manage workers & PINs, set the time limit, export the audit log |
+| Operator | Check out an available knife; return **their own** checked-out knife after use |
+| Sanitation | Mark used (dirty) knives cleaned — one at a time or in a batch |
+| QA | Pass cleaned knives back into service (single or batch), or fail one (with a reason) back to sanitation |
+| Admin | Add knives, retire/restore, manage workers & PINs, set the time limit, export the audit log, return any knife |
 
-A worker can hold multiple roles.
+A worker can hold multiple roles. Only the operator who checked a knife out (or an admin)
+can return it, so returns are attributed to the right person.
+
+## Screens
+
+- **`/`** — live color-coded fleet board; tap a knife to act on it. Sanitation/QA get a
+  **batch mode** to clear many knives at once.
+- **`/reports`** *(any signed-in worker)* — end-of-day sweep of everything still checked out,
+  plus fleet metrics: average sanitation→QA turnaround, QA fail rate, and most-used knives.
+- **`/kiosk`** — full-screen, read-only status board for a wall-mounted display (auto-refreshes).
+- **`/admin`** *(admin)* — add knives, retire/restore, manage workers, set the time limit,
+  and export the full audit log to CSV.
+- **`/knife/<number>`** — a single knife's complete lifecycle history.
 
 ## Tech stack
 
