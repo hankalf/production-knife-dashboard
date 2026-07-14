@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, DISPLAY_ORDER, type DisplayState } from "@/lib/status";
+import { kioskAct } from "@/app/actions";
 
 export type KioskKnife = {
   id: number;
@@ -12,14 +13,31 @@ export type KioskKnife = {
   dueAtMs: number | null;
 };
 
+type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
+
 function stateOf(k: KioskKnife, now: number): DisplayState {
   if (k.status === "CHECKED_OUT" && k.dueAtMs && k.dueAtMs < now) return "OVERDUE";
   return k.status as DisplayState;
 }
 
+// What a floor worker can do to this knife straight from the kiosk.
+function kioskActionFor(status: string): { action: KioskAction; label: string; role: string } | null {
+  switch (status) {
+    case "AVAILABLE":
+      return { action: "CHECKOUT", label: "Check out", role: "Operator" };
+    case "CHECKED_OUT":
+      return { action: "RETURN", label: "Check in (return)", role: "Operator" };
+    case "DIRTY":
+      return { action: "CLEAN", label: "Mark cleaned", role: "Sanitation" };
+    default:
+      return null; // CLEANED (QA) and OUT_OF_SERVICE are handled on the main board
+  }
+}
+
 export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
   const router = useRouter();
   const [now, setNow] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     setNow(Date.now());
@@ -43,10 +61,11 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
   }, [withState]);
 
   const overdue = withState.filter((x) => x.state === "OVERDUE").map((x) => x.k.number);
+  const selected = knives.find((k) => k.id === selectedId) ?? null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <span aria-hidden>🔪</span> Safety Knife Status Board
         </h1>
@@ -54,6 +73,10 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
           Exit kiosk ✕
         </Link>
       </div>
+      <p className="text-slate-400 text-sm mb-4">
+        Tap a knife to check out, check in, or mark cleaned — you&apos;ll confirm with your PIN.
+        QA and admin actions use the main board.
+      </p>
 
       {/* Big status counts */}
       <div className="flex flex-wrap gap-3 mb-5">
@@ -77,16 +100,148 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
       )}
 
       {/* Large grid */}
-      <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3 flex-1 content-start">
+      <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3 content-start">
         {withState.map(({ k, state }) => (
-          <div
+          <button
             key={k.id}
-            className={`aspect-square rounded-2xl border-2 flex items-center justify-center text-2xl font-bold ${STATUS_META[state].tile}`}
+            onClick={() => setSelectedId(k.id)}
+            className={`aspect-square rounded-2xl border-2 flex items-center justify-center text-2xl font-bold transition ${STATUS_META[state].tile}`}
             title={`#${k.number} — ${STATUS_META[state].label}`}
           >
             #{k.number}
-          </div>
+          </button>
         ))}
+      </div>
+
+      {selected && (
+        <KioskModal
+          knife={selected}
+          state={stateOf(selected, now || Date.now())}
+          onClose={() => setSelectedId(null)}
+          onDone={() => {
+            setSelectedId(null);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function KioskModal({
+  knife,
+  state,
+  onClose,
+  onDone,
+}: {
+  knife: KioskKnife;
+  state: DisplayState;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const act = kioskActionFor(knife.status);
+
+  function submit() {
+    if (!act) return;
+    setError(null);
+    start(async () => {
+      const res = await kioskAct(knife.id, act.action, pin);
+      if (res.ok) onDone();
+      else {
+        setError(res.error ?? "Action failed.");
+        setPin("");
+      }
+    });
+  }
+
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white text-slate-900 w-full max-w-sm rounded-2xl shadow-xl p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-2xl font-bold">Knife #{knife.number}</h2>
+          <button onClick={onClose} className="text-slate-400 text-3xl leading-none px-2">
+            ×
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mb-4">
+          <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[state].dot}`} />
+          <span className="font-medium">{STATUS_META[state].label}</span>
+        </div>
+
+        {!act ? (
+          <p className="text-slate-600">
+            No kiosk action for this knife.{" "}
+            {knife.status === "CLEANED"
+              ? "It's awaiting QA — handle it on the main board."
+              : "It's out of service."}
+          </p>
+        ) : (
+          <>
+            <div className="rounded-lg bg-slate-100 px-4 py-3 mb-4 text-center">
+              <div className="text-lg font-semibold">{act.label}</div>
+              <div className="text-xs text-slate-500">Enter your {act.role} PIN to confirm</div>
+            </div>
+
+            <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
+              {pin.replace(/./g, "•") || (
+                <span className="text-slate-300 tracking-normal text-base">enter PIN</span>
+              )}
+            </div>
+            {error && (
+              <p className="text-center text-sm text-red-600 mb-3" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              {keys.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => {
+                    setError(null);
+                    setPin((p) => (p.length >= 8 ? p : p + d));
+                  }}
+                  className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
+                >
+                  {d}
+                </button>
+              ))}
+              <button
+                onClick={() => setPin((p) => p.slice(0, -1))}
+                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-lg"
+                aria-label="Delete"
+              >
+                ⌫
+              </button>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setPin((p) => (p.length >= 8 ? p : p + "0"));
+                }}
+                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
+              >
+                0
+              </button>
+              <button
+                onClick={submit}
+                disabled={pending || pin.length === 0}
+                className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
+              >
+                {pending ? "…" : "Confirm"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
