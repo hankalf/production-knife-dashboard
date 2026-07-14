@@ -27,11 +27,19 @@ AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)�
 |------|--------|
 | Operator | Check out an available knife; return **their own** checked-out knife after use |
 | Sanitation | Mark used (dirty) knives cleaned — one at a time or in a batch |
-| QA | Pass cleaned knives back into service (single or batch), or fail one (with a reason) back to sanitation |
-| Admin | Add knives, retire/restore, manage workers & PINs, set the time limit, export the audit log, return any knife |
+| QA | Pass cleaned knives back into service (single or batch), or fail one (with a reason) back to sanitation; open the admin panel |
+| Admin | **Everything** — all operator/sanitation/QA functions, plus add knives, retire/restore, manage workers & PINs, set the time limit, lock the kiosk, and export the audit log |
 
-A worker can hold multiple roles. Only the operator who checked a knife out (or an admin)
-can return it, so returns are attributed to the right person.
+A worker can hold multiple roles, and **admins implicitly have every capability**. Only the
+operator who checked a knife out (or an admin) can return it, so returns are attributed to the
+right person.
+
+## Access & the admin panel
+
+- The **admin panel** (`/admin`) is limited to **admins and QA**. Opening it prompts for a PIN;
+  operators/sanitation are shown an access-denied message.
+- Floor actions on the main board and kiosk are gated by role — each person only sees the
+  actions they're allowed to take.
 
 ## Screens
 
@@ -41,8 +49,10 @@ can return it, so returns are attributed to the right person.
   plus fleet metrics: average sanitation→QA turnaround, QA fail rate, and most-used knives.
 - **`/kiosk`** — full-screen status board for a wall-mounted display (auto-refreshes).
   Floor staff can check out, check in, and mark cleaned right on the kiosk, confirming
-  each action with their PIN. A supervisor can **lock the kiosk to view-only** (from the
-  kiosk with an admin PIN, or from Admin → Kiosk mode); locking is enforced server-side.
+  each action with their PIN and optionally **adding a note** (e.g. sanitation flagging
+  residue) that lands in the audit trail. A supervisor can **lock the kiosk to view-only**
+  (from the kiosk with an admin/QA PIN, or from Admin → Kiosk mode); locking is enforced
+  server-side.
 - **`/admin`** *(admin)* — add knives, retire/restore, manage workers, set the time limit,
   export the full audit log to CSV, and configure **email alerts** (see below).
 - **`/knife/<number>`** — a single knife's complete lifecycle history.

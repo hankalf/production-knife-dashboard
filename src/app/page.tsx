@@ -1,6 +1,6 @@
 import { getKnives } from "@/lib/data";
 import { getCurrentWorker } from "@/lib/session";
-import { parseRoles } from "@/lib/status";
+import { effectiveRoles } from "@/lib/status";
 import KnifeBoard, { type KnifeDTO } from "@/components/KnifeBoard";
 import { PinPad } from "@/components/SessionControls";
 import { Legend } from "@/components/Legend";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const [knives, worker] = await Promise.all([getKnives(), getCurrentWorker()]);
-  const roles = worker ? parseRoles(worker.roles) : [];
+  const roles = worker ? effectiveRoles(worker.roles) : [];
 
   const dto: KnifeDTO[] = knives.map((k) => ({
     id: k.id,

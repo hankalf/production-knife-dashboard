@@ -9,7 +9,7 @@ import {
   clearCurrentWorker,
 } from "@/lib/session";
 import { getCheckoutWindowHours } from "@/lib/data";
-import { ROLE, STATUS, hasRole, type Role } from "@/lib/status";
+import { ROLE, STATUS, hasRole, canAccessAdmin, type Role } from "@/lib/status";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -52,6 +52,18 @@ async function requireWorkerWithRole(role: Role): Promise<
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
 
+// Admin panel is open to admins and QA.
+async function requirePanelAccess(): Promise<
+  { ok: true; workerId: number; roles: string } | { ok: false; error: string }
+> {
+  const worker = await getCurrentWorker();
+  if (!worker) return { ok: false, error: "Sign in with your PIN first." };
+  if (!canAccessAdmin(worker.roles)) {
+    return { ok: false, error: "The admin panel is limited to admins and QA." };
+  }
+  return { ok: true, workerId: worker.id, roles: worker.roles };
+}
+
 type Actor = { workerId: number; roles: string };
 type GuardContext = Actor;
 
@@ -75,9 +87,12 @@ type TransitionOpts = {
 async function applyTransition(
   knifeId: number,
   opts: TransitionOpts,
-  actor: Actor
+  actor: Actor,
+  // When the caller already authorized the actor (e.g. panel access covers
+  // this action), skip the single-role check.
+  authorized = false
 ): Promise<ActionResult> {
-  if (!hasRole(actor.roles, opts.role)) {
+  if (!authorized && !hasRole(actor.roles, opts.role)) {
     return fail(`This action requires the ${opts.role} role.`);
   }
   try {
@@ -180,21 +195,21 @@ async function writeKioskLocked(locked: boolean): Promise<void> {
 
 // From the Admin panel (signed-in admin).
 export async function setKioskLocked(locked: boolean): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   await writeKioskLocked(locked);
   return ok();
 }
 
-// From the kiosk itself — a supervisor confirms with their admin PIN.
+// From the kiosk itself — a supervisor confirms with their PIN.
 export async function setKioskLockedWithPin(
   locked: boolean,
   pin: string
 ): Promise<ActionResult> {
   const actor = await actorFromPin(pin);
   if (!actor) return fail("PIN not recognized.");
-  if (!hasRole(actor.roles, ROLE.ADMIN)) {
-    return fail("Only an admin can lock or unlock the kiosk.");
+  if (!canAccessAdmin(actor.roles)) {
+    return fail("Only an admin or QA can lock or unlock the kiosk.");
   }
   await writeKioskLocked(locked);
   return ok();
@@ -205,7 +220,8 @@ export async function setKioskLockedWithPin(
 export async function kioskAct(
   knifeId: number,
   action: "CHECKOUT" | "RETURN" | "CLEAN",
-  pin: string
+  pin: string,
+  note?: string
 ): Promise<ActionResult> {
   // Respect the supervisor lock even if a client bypasses the disabled UI.
   const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
@@ -214,6 +230,8 @@ export async function kioskAct(
   const actor = await actorFromPin(pin);
   if (!actor) return fail("PIN not recognized.");
   const opts = await kioskOpts(action, actor);
+  const trimmed = (note || "").trim();
+  if (trimmed) opts.note = trimmed;
   return applyTransition(knifeId, opts, actor);
 }
 
@@ -311,35 +329,49 @@ export async function batchQaPass(ids: number[]): Promise<BatchResult> {
 }
 
 export async function retireKnife(knifeId: number, reason: string): Promise<ActionResult> {
-  return transition(knifeId, {
-    action: "RETIRE",
-    from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DIRTY, STATUS.CLEANED],
-    to: STATUS.OUT_OF_SERVICE,
-    role: ROLE.ADMIN,
-    note: (reason || "").trim() || undefined,
-    data: {
-      retiredAt: new Date(),
-      checkedOutById: null,
-      checkedOutAt: null,
-      dueAt: null,
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  return applyTransition(
+    knifeId,
+    {
+      action: "RETIRE",
+      from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DIRTY, STATUS.CLEANED],
+      to: STATUS.OUT_OF_SERVICE,
+      role: ROLE.ADMIN,
+      note: (reason || "").trim() || undefined,
+      data: {
+        retiredAt: new Date(),
+        checkedOutById: null,
+        checkedOutAt: null,
+        dueAt: null,
+      },
     },
-  });
+    { workerId: auth.workerId, roles: auth.roles },
+    true
+  );
 }
 
 export async function restoreKnife(knifeId: number): Promise<ActionResult> {
-  return transition(knifeId, {
-    action: "RESTORE",
-    from: [STATUS.OUT_OF_SERVICE],
-    to: STATUS.DIRTY,
-    role: ROLE.ADMIN,
-    data: { retiredAt: null },
-  });
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  return applyTransition(
+    knifeId,
+    {
+      action: "RESTORE",
+      from: [STATUS.OUT_OF_SERVICE],
+      to: STATUS.DIRTY,
+      role: ROLE.ADMIN,
+      data: { retiredAt: null },
+    },
+    { workerId: auth.workerId, roles: auth.roles },
+    true
+  );
 }
 
 // ---- Admin: fleet & workers ----------------------------------------------
 
 export async function addKnife(number: string): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   const label = (number || "").trim();
   if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
@@ -376,7 +408,7 @@ export async function addWorker(
   pin: string,
   roles: string[]
 ): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   const cleanName = (name || "").trim();
   const cleanPin = (pin || "").trim();
@@ -413,7 +445,7 @@ export async function setWorkerActive(
   workerId: number,
   active: boolean
 ): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
   if (!target) return fail("Worker not found.");
@@ -429,7 +461,7 @@ export async function updateWorker(
   workerId: number,
   input: { name: string; roles: string[]; pin?: string }
 ): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
 
   const cleanName = (input.name || "").trim();
@@ -467,7 +499,7 @@ export async function updateWorker(
 }
 
 export async function deleteWorker(workerId: number): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
 
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
@@ -500,7 +532,7 @@ export async function updateEmailSettings(input: {
   notifyOverdue: boolean;
   notifyDailySweep: boolean;
 }): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
 
   const recipients = input.recipients
@@ -531,7 +563,7 @@ export async function updateEmailSettings(input: {
 }
 
 export async function updateCheckoutWindow(hours: number): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
   if (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 30) {
     return fail("Enter a valid number of hours.");

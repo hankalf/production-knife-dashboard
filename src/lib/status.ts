@@ -91,7 +91,26 @@ export function parseRoles(roles: string): Role[] {
 }
 
 export function hasRole(roles: string, role: Role): boolean {
-  return parseRoles(roles).includes(role);
+  const parsed = parseRoles(roles);
+  // Admins can perform every function (operator, sanitation, QA, admin).
+  if (parsed.includes(ROLE.ADMIN)) return true;
+  return parsed.includes(role);
+}
+
+// Who may open the admin panel: admins and QA.
+export function canAccessAdmin(roles: string): boolean {
+  const parsed = parseRoles(roles);
+  return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.QA);
+}
+
+// The capabilities a worker effectively has — admins get every function.
+// Used for client-side button gating so the UI matches `hasRole`.
+export function effectiveRoles(roles: string): Role[] {
+  const parsed = parseRoles(roles);
+  if (parsed.includes(ROLE.ADMIN)) {
+    return [ROLE.OPERATOR, ROLE.SANITATION, ROLE.QA, ROLE.ADMIN];
+  }
+  return parsed;
 }
 
 // Human labels for audit actions.

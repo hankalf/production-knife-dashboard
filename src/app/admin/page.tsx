@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentWorker } from "@/lib/session";
-import { hasRole } from "@/lib/status";
+import { canAccessAdmin } from "@/lib/status";
 import {
   getWorkers,
   getCheckoutWindowHours,
@@ -10,17 +10,40 @@ import {
 } from "@/lib/data";
 import { ACTION_LABEL } from "@/lib/status";
 import { AdminPanel } from "@/components/AdminPanel";
+import { PinPad } from "@/components/SessionControls";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const worker = await getCurrentWorker();
-  if (!worker || !hasRole(worker.roles, "ADMIN")) {
+
+  // Not signed in → show the PIN prompt right here to verify access level.
+  if (!worker) {
+    return (
+      <div className="max-w-md mx-auto py-10 space-y-6">
+        <div className="text-center">
+          <h1 className="text-xl font-bold mb-1">Admin panel</h1>
+          <p className="text-slate-500 text-sm">
+            Enter your PIN to continue. Only admins and QA can open this panel.
+          </p>
+        </div>
+        <PinPad />
+        <div className="text-center">
+          <Link href="/" className="text-sky-700 underline text-sm">
+            ← Back to fleet
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Signed in but not permitted → access denied.
+  if (!canAccessAdmin(worker.roles)) {
     return (
       <div className="max-w-md mx-auto text-center py-12">
-        <h1 className="text-xl font-bold mb-2">Admin only</h1>
+        <h1 className="text-xl font-bold mb-2">No access</h1>
         <p className="text-slate-500 mb-4">
-          You must be signed in with an ADMIN PIN to manage knives and workers.
+          The admin panel is limited to admins and QA. You&apos;re signed in as {worker.name}.
         </p>
         <Link href="/" className="text-sky-700 underline">
           ← Back to fleet

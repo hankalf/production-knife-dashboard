@@ -1,5 +1,5 @@
 import { getCurrentWorker } from "@/lib/session";
-import { hasRole } from "@/lib/status";
+import { canAccessAdmin } from "@/lib/status";
 import { getAllEventsForExport } from "@/lib/data";
 
 function csvCell(value: string | null | undefined): string {
@@ -10,8 +10,8 @@ function csvCell(value: string | null | undefined): string {
 
 export async function GET() {
   const worker = await getCurrentWorker();
-  if (!worker || !hasRole(worker.roles, "ADMIN")) {
-    return new Response("Forbidden — ADMIN only.", { status: 403 });
+  if (!worker || !canAccessAdmin(worker.roles)) {
+    return new Response("Forbidden — admins and QA only.", { status: 403 });
   }
 
   const events = await getAllEventsForExport();

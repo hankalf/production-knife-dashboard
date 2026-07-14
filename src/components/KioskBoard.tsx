@@ -214,12 +214,12 @@ function LockDialog({
         </div>
         <p className="text-sm text-slate-600 mb-4">
           {nextLocked
-            ? "Puts the kiosk in view-only mode. Enter an admin PIN to confirm."
-            : "Re-enables check out / check in / clean. Enter an admin PIN to confirm."}
+            ? "Puts the kiosk in view-only mode. Enter an admin or QA PIN to confirm."
+            : "Re-enables check out / check in / clean. Enter an admin or QA PIN to confirm."}
         </p>
         <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
           {pin.replace(/./g, "•") || (
-            <span className="text-slate-300 tracking-normal text-base">admin PIN</span>
+            <span className="text-slate-300 tracking-normal text-base">admin / QA PIN</span>
           )}
         </div>
         {error && (
@@ -283,6 +283,7 @@ function KioskModal({
   onDone: () => void;
 }) {
   const [pin, setPin] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const act = kioskActionFor(knife.status);
@@ -291,7 +292,7 @@ function KioskModal({
     if (!act) return;
     setError(null);
     start(async () => {
-      const res = await kioskAct(knife.id, act.action, pin);
+      const res = await kioskAct(knife.id, act.action, pin, note);
       if (res.ok) onDone();
       else {
         setError(res.error ?? "Action failed.");
@@ -335,6 +336,19 @@ function KioskModal({
               <div className="text-lg font-semibold">{act.label}</div>
               <div className="text-xs text-slate-500">Enter your {act.role} PIN to confirm</div>
             </div>
+
+            <label className="block text-sm text-slate-600 mb-1">
+              {act.action === "CLEAN"
+                ? "Note (optional — e.g. residue found, extra sanitizing)"
+                : "Note (optional)"}
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Add a note if needed…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
+            />
 
             <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
               {pin.replace(/./g, "•") || (
