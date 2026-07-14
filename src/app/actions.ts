@@ -52,7 +52,8 @@ async function requireWorkerWithRole(role: Role): Promise<
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
 
-type GuardContext = { workerId: number; roles: string };
+type Actor = { workerId: number; roles: string };
+type GuardContext = Actor;
 
 type TransitionOpts = {
   action: string;
@@ -69,10 +70,16 @@ type TransitionOpts = {
   ) => string | null;
 };
 
-async function transition(knifeId: number, opts: TransitionOpts): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(opts.role);
-  if (!auth.ok) return fail(auth.error);
-
+// Core transition, given an already-resolved actor. Used by both the
+// session-based board actions and the PIN-based kiosk actions.
+async function applyTransition(
+  knifeId: number,
+  opts: TransitionOpts,
+  actor: Actor
+): Promise<ActionResult> {
+  if (!hasRole(actor.roles, opts.role)) {
+    return fail(`This action requires the ${opts.role} role.`);
+  }
   try {
     await prisma.$transaction(async (tx) => {
       const knife = await tx.knife.findUnique({ where: { id: knifeId } });
@@ -83,7 +90,7 @@ async function transition(knifeId: number, opts: TransitionOpts): Promise<Action
         );
       }
       if (opts.guard) {
-        const err = opts.guard(knife, { workerId: auth.workerId, roles: auth.roles });
+        const err = opts.guard(knife, actor);
         if (err) throw new Error(err);
       }
       await tx.knife.update({
@@ -93,7 +100,7 @@ async function transition(knifeId: number, opts: TransitionOpts): Promise<Action
       await tx.knifeEvent.create({
         data: {
           knifeId,
-          workerId: auth.workerId,
+          workerId: actor.workerId,
           action: opts.action,
           fromStatus: knife.status,
           toStatus: opts.to,
@@ -107,6 +114,70 @@ async function transition(knifeId: number, opts: TransitionOpts): Promise<Action
 
   revalidatePath("/", "layout");
   return ok();
+}
+
+// Session-based transition (main board): actor comes from the signed-in cookie.
+async function transition(knifeId: number, opts: TransitionOpts): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(opts.role);
+  if (!auth.ok) return fail(auth.error);
+  return applyTransition(knifeId, opts, { workerId: auth.workerId, roles: auth.roles });
+}
+
+// Resolve a worker from a raw PIN (for the shared kiosk, which has no session).
+async function actorFromPin(pin: string): Promise<Actor | null> {
+  const clean = (pin || "").trim();
+  if (!clean) return null;
+  const workers = await prisma.worker.findMany({ where: { active: true } });
+  const worker = workers.find((w) => verifyPin(clean, w.pin));
+  return worker ? { workerId: worker.id, roles: worker.roles } : null;
+}
+
+// Build the transition options for a given kiosk action.
+async function kioskOpts(action: "CHECKOUT" | "RETURN" | "CLEAN", actor: Actor): Promise<TransitionOpts> {
+  if (action === "CHECKOUT") {
+    const hours = await getCheckoutWindowHours();
+    const now = new Date();
+    const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    return {
+      action: "CHECKOUT",
+      from: [STATUS.AVAILABLE],
+      to: STATUS.CHECKED_OUT,
+      role: ROLE.OPERATOR,
+      data: { checkedOutById: actor.workerId, checkedOutAt: now, dueAt: due },
+    };
+  }
+  if (action === "RETURN") {
+    return {
+      action: "RETURN",
+      from: [STATUS.CHECKED_OUT],
+      to: STATUS.DIRTY,
+      role: ROLE.OPERATOR,
+      data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
+      guard: (knife, ctx) =>
+        knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
+          ? null
+          : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
+    };
+  }
+  return {
+    action: "CLEAN",
+    from: [STATUS.DIRTY],
+    to: STATUS.CLEANED,
+    role: ROLE.SANITATION,
+  };
+}
+
+// Kiosk action: identify by PIN, then run the transition. Operators can
+// check out / check in; sanitation can clean. QA/admin use the main board.
+export async function kioskAct(
+  knifeId: number,
+  action: "CHECKOUT" | "RETURN" | "CLEAN",
+  pin: string
+): Promise<ActionResult> {
+  const actor = await actorFromPin(pin);
+  if (!actor) return fail("PIN not recognized.");
+  const opts = await kioskOpts(action, actor);
+  return applyTransition(knifeId, opts, actor);
 }
 
 // ---- Lifecycle actions ----------------------------------------------------
@@ -294,13 +365,92 @@ export async function addWorker(
   return ok();
 }
 
+// Count active admins other than `excludeId` — used to prevent locking
+// everyone out by removing/deactivating the last admin.
+async function activeAdminsExcluding(excludeId: number): Promise<number> {
+  const workers = await prisma.worker.findMany({ where: { active: true } });
+  return workers.filter((w) => w.id !== excludeId && hasRole(w.roles, ROLE.ADMIN)).length;
+}
+
 export async function setWorkerActive(
   workerId: number,
   active: boolean
 ): Promise<ActionResult> {
   const auth = await requireWorkerWithRole(ROLE.ADMIN);
   if (!auth.ok) return fail(auth.error);
+  const target = await prisma.worker.findUnique({ where: { id: workerId } });
+  if (!target) return fail("Worker not found.");
+  if (!active && hasRole(target.roles, ROLE.ADMIN) && (await activeAdminsExcluding(workerId)) === 0) {
+    return fail("You can't deactivate the last admin — add another admin first.");
+  }
   await prisma.worker.update({ where: { id: workerId }, data: { active } });
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+export async function updateWorker(
+  workerId: number,
+  input: { name: string; roles: string[]; pin?: string }
+): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  if (!auth.ok) return fail(auth.error);
+
+  const cleanName = (input.name || "").trim();
+  if (!cleanName) return fail("Name is required.");
+  const validRoles = input.roles.filter((r) => r in ROLE);
+  if (validRoles.length === 0) return fail("Select at least one role.");
+
+  const target = await prisma.worker.findUnique({ where: { id: workerId } });
+  if (!target) return fail("Worker not found.");
+
+  // Don't let the last admin drop their own ADMIN role.
+  const losingAdmin = hasRole(target.roles, ROLE.ADMIN) && !validRoles.includes(ROLE.ADMIN);
+  if (losingAdmin && target.active && (await activeAdminsExcluding(workerId)) === 0) {
+    return fail("You can't remove the last admin's ADMIN role — add another admin first.");
+  }
+
+  const data: { name: string; roles: string; pin?: string } = {
+    name: cleanName,
+    roles: validRoles.join(","),
+  };
+
+  const newPin = (input.pin || "").trim();
+  if (newPin) {
+    if (!/^\d{4,8}$/.test(newPin)) return fail("PIN must be 4–8 digits.");
+    const others = await prisma.worker.findMany({ where: { id: { not: workerId } } });
+    if (others.some((w) => verifyPin(newPin, w.pin))) {
+      return fail("That PIN is already in use — choose another.");
+    }
+    data.pin = hashPin(newPin);
+  }
+
+  await prisma.worker.update({ where: { id: workerId }, data });
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+export async function deleteWorker(workerId: number): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  if (!auth.ok) return fail(auth.error);
+
+  const target = await prisma.worker.findUnique({ where: { id: workerId } });
+  if (!target) return fail("Worker not found.");
+
+  // Protect the audit trail: anyone with recorded activity can only be deactivated.
+  const eventCount = await prisma.knifeEvent.count({ where: { workerId } });
+  if (eventCount > 0) {
+    return fail(
+      "This employee has activity history — deactivate them instead so the audit trail stays intact."
+    );
+  }
+  if (await prisma.knife.count({ where: { checkedOutById: workerId } })) {
+    return fail("This employee currently holds a knife — return it first.");
+  }
+  if (hasRole(target.roles, ROLE.ADMIN) && target.active && (await activeAdminsExcluding(workerId)) === 0) {
+    return fail("You can't remove the last admin — add another admin first.");
+  }
+
+  await prisma.worker.delete({ where: { id: workerId } });
   revalidatePath("/", "layout");
   return ok();
 }
