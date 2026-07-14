@@ -7,6 +7,8 @@ import {
   getCurrentWorker,
   setCurrentWorker,
   clearCurrentWorker,
+  setAdminGate,
+  clearAdminGate,
 } from "@/lib/session";
 import { getCheckoutWindowHours } from "@/lib/data";
 import { ROLE, STATUS, hasRole, canAccessAdmin, type Role } from "@/lib/status";
@@ -35,6 +37,24 @@ export async function login(pin: string): Promise<ActionResult> {
 
 export async function logout(): Promise<ActionResult> {
   await clearCurrentWorker();
+  await clearAdminGate();
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+// Verify a PIN specifically to open the admin dashboard. Sets the worker
+// session (for attribution) and a short-lived admin gate. Admin/QA only.
+export async function unlockAdmin(pin: string): Promise<ActionResult> {
+  const clean = (pin || "").trim();
+  if (!clean) return fail("Enter your PIN.");
+  const workers = await prisma.worker.findMany({ where: { active: true } });
+  const worker = workers.find((w) => verifyPin(clean, w.pin));
+  if (!worker) return fail("PIN not recognized.");
+  if (!canAccessAdmin(worker.roles)) {
+    return fail("The admin panel is limited to admins and QA.");
+  }
+  await setCurrentWorker(worker.id);
+  await setAdminGate(worker.id);
   revalidatePath("/", "layout");
   return ok();
 }
