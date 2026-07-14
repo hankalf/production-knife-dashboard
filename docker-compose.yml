@@ -1,0 +1,17 @@
+# Local Postgres for development. Matches the DATABASE_URL in .env.
+# Start it with:  docker compose up -d
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: knife
+      POSTGRES_PASSWORD: knife
+      POSTGRES_DB: knifedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - knife_pgdata:/var/lib/postgresql/data
+
+volumes:
+  knife_pgdata:
