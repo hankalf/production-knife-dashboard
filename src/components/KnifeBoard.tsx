@@ -194,7 +194,7 @@ export default function KnifeBoard({
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 md:grid-cols-[repeat(14,minmax(0,1fr))]">
         {visible.map(({ k, state }) => {
           const eligible = batchMode && batchOption && k.status === batchOption.status;
           const isPicked = picked.has(k.id);
@@ -204,7 +204,7 @@ export default function KnifeBoard({
               onClick={() =>
                 eligible ? togglePicked(k.id) : batchMode ? undefined : setSelectedId(k.id)
               }
-              className={`relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center font-bold text-lg transition ${
+              className={`relative aspect-square rounded-lg border-2 flex flex-col items-center justify-center font-bold text-xs sm:text-sm md:text-base transition ${
                 STATUS_META[state].tile
               } ${batchMode && !eligible ? "opacity-40" : ""} ${
                 isPicked ? "ring-4 ring-offset-2 ring-slate-900" : ""
@@ -445,7 +445,7 @@ function KnifeModal({
               </>
             )}
 
-            {has("ADMIN") && is !== "OUT_OF_SERVICE" && (
+            {(has("ADMIN") || has("QA")) && is !== "OUT_OF_SERVICE" && (
               <ActionButton
                 pending={pending}
                 onClick={() => run(() => retireKnife(knife.id, reason))}
@@ -454,7 +454,7 @@ function KnifeModal({
                 Retire (out of service)
               </ActionButton>
             )}
-            {has("ADMIN") && is === "OUT_OF_SERVICE" && (
+            {(has("ADMIN") || has("QA")) && is === "OUT_OF_SERVICE" && (
               <ActionButton
                 pending={pending}
                 onClick={() => run(() => restoreKnife(knife.id))}
