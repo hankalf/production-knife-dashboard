@@ -47,17 +47,23 @@ can return it, so returns are attributed to the right person.
 ## Tech stack
 
 - **Next.js (App Router, TypeScript)** — single deployable full-stack app
-- **SQLite + Prisma** — file-based database, no external services
+- **PostgreSQL + Prisma** — managed database with versioned migrations
 - **Tailwind CSS** — touch-friendly, tablet-first UI
 
 ## Getting started
 
+You need a PostgreSQL database. The quickest way locally is the bundled Docker Compose file:
+
 ```bash
+docker compose up -d      # starts Postgres on localhost:5432 (matches .env)
 npm install
-npm run db:push     # create the SQLite schema
-npm run db:seed     # seed 42 knives (1–14, 51–64, 65–78) + starter workers
-npm run dev         # http://localhost:3000
+npm run db:migrate        # apply migrations (creates the tables)
+npm run db:seed           # seed 42 knives (1–14, 51–64, 65–78) + starter workers
+npm run dev               # http://localhost:3000
 ```
+
+Already have a Postgres you'd rather use? Put its connection string in `DATABASE_URL`
+(in `.env`) and skip the `docker compose` step.
 
 ### Default PINs (change these in Admin)
 
@@ -70,48 +76,31 @@ npm run dev         # http://localhost:3000
 
 ### Useful scripts
 
-- `npm run db:reset` — wipe and re-seed the database
+- `npm run db:migrate:dev` — create a new migration after editing the schema
+- `npm run db:reset` — drop, re-migrate, and re-seed the database
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
 
-## Deployment (recommended)
+## Deploy on Railway
 
-Run as a **single self-hosted app** on one machine on the plant network:
+Railway gives you a public URL you can open on any device (including a floor tablet), and
+this repo is set up so it deploys with almost no configuration. `start:prod` applies
+database migrations and seeds the fleet on every boot.
 
-```bash
-npm run build
-npm start   # serves on port 3000
-```
+1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
+   and pick `production-knife-dashboard` (choose the branch you want to deploy).
+2. In the same project, click **New → Database → Add PostgreSQL**. Railway provisions it and
+   exposes its connection string as a `DATABASE_URL` variable.
+3. Open your app service → **Variables** → add a reference variable
+   **`DATABASE_URL`** = `${{Postgres.DATABASE_URL}}` (Railway autocompletes this once the
+   Postgres service exists), so the app points at the database.
+4. Railway builds with `npm run build`, then runs `npm run start:prod` (migrate → seed →
+   serve). When it's green, open **Settings → Networking → Generate Domain** for your URL.
+5. Sign in with the default PINs — **Admin `0000`, Operator `1111`, Sanitation `2222`,
+   QA `3333`** — and change them in Admin.
 
-Point tablets/desktops at `http://<that-machine>:3000`. Keeps working without internet,
-keeps data on-site, and the whole database is one file (`prisma/dev.db`) that's trivial to
-back up nightly.
-
-## Deploy a test on Railway
-
-Railway gives you a public URL you can open on any device (including a floor tablet).
-The repo is already set up for it (`railway.json` + a `start:prod` script that creates the
-schema and seeds the fleet on boot).
-
-1. Push this branch to GitHub (already done).
-2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** →
-   pick `production-knife-dashboard` and the `claude/safety-knife-checkout-system-999z8h` branch.
-3. Railway auto-detects Next.js, runs `npm run build`, then `npm run start:prod`. When the deploy
-   finishes, open **Settings → Networking → Generate Domain** to get your public URL.
-4. Sign in with the default PINs (Admin `0000`, Operator `1111`, Sanitation `2222`, QA `3333`).
-
-**Data persistence (optional but recommended).** This app uses a single SQLite file. Without a
-volume, Railway's disk is ephemeral, so your test data resets on each redeploy (the fleet is
-re-seeded on every boot, so the app still works fine — you just lose in-progress checkouts).
-To keep data across deploys:
-
-- Add a **Volume** to the service, mounted at `/data`.
-- Set an environment variable `DATABASE_URL=file:/data/prod.db`.
-
-That's it — the seed is idempotent, so redeploys won't duplicate knives or workers.
-
-> For a permanent multi-user production install, prefer Postgres (Railway one-click) over
-> SQLite; ask and I'll switch the Prisma datasource and add migrations.
+Data lives in the Postgres service and persists across redeploys. The seed is idempotent,
+so redeploys never duplicate knives or workers.
 
 ## Audit log
 

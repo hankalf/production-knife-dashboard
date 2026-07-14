@@ -26,7 +26,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma / sqlite database files
+# prisma / sqlite database files (SQLite no longer used, kept for safety)
 /prisma/*.db
 /prisma/*.db-journal
 *.sqlite
