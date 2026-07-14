@@ -6,6 +6,8 @@ import Link from "next/link";
 import {
   STATUS_META,
   DISPLAY_ORDER,
+  TYPE_META,
+  normalizeType,
   type DisplayState,
 } from "@/lib/status";
 import {
@@ -16,6 +18,7 @@ import {
   qaFailKnife,
   retireKnife,
   restoreKnife,
+  setKnifeType,
   batchClean,
   batchQaPass,
   type ActionResult,
@@ -26,6 +29,7 @@ export type KnifeDTO = {
   id: number;
   number: string;
   status: string;
+  type: string;
   dueAtMs: number | null;
   checkedOutAtMs: number | null;
   holderName: string | null;
@@ -209,8 +213,13 @@ export default function KnifeBoard({
               } ${batchMode && !eligible ? "opacity-40" : ""} ${
                 isPicked ? "ring-4 ring-offset-2 ring-slate-900" : ""
               }`}
-              title={`Knife #${k.number} — ${STATUS_META[state].label}`}
+              title={`Knife #${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
+              <span
+                className={`absolute top-0.5 left-0.5 rounded px-1 leading-tight text-[9px] sm:text-[10px] font-bold ${TYPE_META[normalizeType(k.type)].badge}`}
+              >
+                {TYPE_META[normalizeType(k.type)].short}
+              </span>
               <span>#{k.number}</span>
               {isPicked && (
                 <span className="absolute top-1 right-1 bg-white text-slate-900 rounded-full w-5 h-5 text-xs flex items-center justify-center">
@@ -348,9 +357,14 @@ function KnifeModal({
             ×
           </button>
         </div>
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[state].dot}`} />
           <span className="font-medium">{STATUS_META[state].label}</span>
+          <span
+            className={`ml-1 rounded px-2 py-0.5 text-xs font-bold ${TYPE_META[normalizeType(knife.type)].badge}`}
+          >
+            {TYPE_META[normalizeType(knife.type)].label}
+          </span>
         </div>
 
         <dl className="text-sm text-slate-600 space-y-1 mb-4">
@@ -462,6 +476,31 @@ function KnifeModal({
               >
                 Restore to fleet
               </ActionButton>
+            )}
+
+            {(has("ADMIN") || has("QA")) && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-500 mb-1">Knife type</div>
+                <div className="flex gap-2">
+                  {(["FC", "NFC"] as const).map((t) => {
+                    const active = normalizeType(knife.type) === t;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => !active && run(() => setKnifeType(knife.id, t))}
+                        disabled={pending}
+                        className={`flex-1 rounded-lg py-2 text-sm font-semibold border disabled:opacity-50 ${
+                          active
+                            ? `${TYPE_META[t].badge} border-transparent`
+                            : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {TYPE_META[t].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         )}

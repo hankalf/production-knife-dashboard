@@ -16,6 +16,7 @@ export default async function DashboardPage() {
     id: k.id,
     number: k.number,
     status: k.status,
+    type: k.type,
     dueAtMs: k.dueAt ? k.dueAt.getTime() : null,
     checkedOutAtMs: k.checkedOutAt ? k.checkedOutAt.getTime() : null,
     holderName: k.checkedOutBy?.name ?? null,
