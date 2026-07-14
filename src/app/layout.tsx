@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Link from "next/link";
 import { getCurrentWorker } from "@/lib/session";
-import { parseRoles } from "@/lib/status";
+import { canAccessAdmin } from "@/lib/status";
 import { LogoutButton } from "@/components/SessionControls";
 
 export const metadata: Metadata = {
@@ -22,7 +22,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const worker = await getCurrentWorker();
-  const roles = worker ? parseRoles(worker.roles) : [];
 
   return (
     <html lang="en">
@@ -49,7 +48,7 @@ export default async function RootLayout({
                     >
                       Reports
                     </Link>
-                    {roles.includes("ADMIN") && (
+                    {worker && canAccessAdmin(worker.roles) && (
                       <Link
                         href="/admin"
                         className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5"
