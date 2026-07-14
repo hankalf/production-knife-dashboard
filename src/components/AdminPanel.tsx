@@ -10,6 +10,7 @@ import {
   deleteWorker,
   updateCheckoutWindow,
   updateEmailSettings,
+  setKioskLocked,
   type ActionResult,
 } from "@/app/actions";
 import type { EmailSettings } from "@/lib/data";
@@ -20,10 +21,12 @@ type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 
 export function AdminPanel({
   checkoutWindowHours,
+  kioskLocked,
   emailSettings,
   workers,
 }: {
   checkoutWindowHours: number;
+  kioskLocked: boolean;
   emailSettings: EmailSettings;
   workers: WorkerRow[];
 }) {
@@ -34,9 +37,47 @@ export function AdminPanel({
         <CheckoutWindowCard hours={checkoutWindowHours} />
         <AddWorkerCard />
         <WorkersCard workers={workers} />
+        <KioskLockCard locked={kioskLocked} />
       </div>
       <EmailAlertsCard settings={emailSettings} />
     </div>
+  );
+}
+
+function KioskLockCard({ locked }: { locked: boolean }) {
+  const { pending, msg, run } = useRun();
+  return (
+    <Card title="Kiosk mode">
+      <p className="text-sm text-slate-500 mb-3">
+        The wall-display kiosk lets floor staff check out, check in, and clean with their PIN.
+        Lock it to make the kiosk view-only (supervisors can also lock/unlock from the kiosk
+        itself with an admin PIN).
+      </p>
+      <div className="flex items-center gap-3">
+        <span
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
+            locked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+          }`}
+        >
+          {locked ? "🔒 Locked (view-only)" : "🔓 Interactive"}
+        </span>
+        <button
+          onClick={() =>
+            run(
+              () => setKioskLocked(!locked),
+              `Kiosk ${locked ? "unlocked" : "locked"}.`
+            )
+          }
+          disabled={pending}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+            locked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
+          }`}
+        >
+          {locked ? "Unlock kiosk" : "Lock kiosk"}
+        </button>
+      </div>
+      <Msg msg={msg} />
+    </Card>
   );
 }
 

@@ -39,7 +39,10 @@ can return it, so returns are attributed to the right person.
   **batch mode** to clear many knives at once.
 - **`/reports`** *(any signed-in worker)* — end-of-day sweep of everything still checked out,
   plus fleet metrics: average sanitation→QA turnaround, QA fail rate, and most-used knives.
-- **`/kiosk`** — full-screen, read-only status board for a wall-mounted display (auto-refreshes).
+- **`/kiosk`** — full-screen status board for a wall-mounted display (auto-refreshes).
+  Floor staff can check out, check in, and mark cleaned right on the kiosk, confirming
+  each action with their PIN. A supervisor can **lock the kiosk to view-only** (from the
+  kiosk with an admin PIN, or from Admin → Kiosk mode); locking is enforced server-side.
 - **`/admin`** *(admin)* — add knives, retire/restore, manage workers, set the time limit,
   export the full audit log to CSV, and configure **email alerts** (see below).
 - **`/knife/<number>`** — a single knife's complete lifecycle history.

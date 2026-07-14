@@ -32,6 +32,12 @@ export async function getEmailSettings(): Promise<EmailSettings> {
   };
 }
 
+// When true, the shared kiosk is view-only until a supervisor unlocks it.
+export async function getKioskLocked(): Promise<boolean> {
+  const s = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
+  return s?.value === "true";
+}
+
 export async function getKnives() {
   return prisma.knife.findMany({
     orderBy: { sortKey: "asc" },

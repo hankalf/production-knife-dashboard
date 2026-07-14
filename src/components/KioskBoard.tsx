@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_META, DISPLAY_ORDER, type DisplayState } from "@/lib/status";
-import { kioskAct } from "@/app/actions";
+import { kioskAct, setKioskLockedWithPin } from "@/app/actions";
 
 export type KioskKnife = {
   id: number;
@@ -34,10 +34,17 @@ function kioskActionFor(status: string): { action: KioskAction; label: string; r
   }
 }
 
-export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
+export default function KioskBoard({
+  knives,
+  locked,
+}: {
+  knives: KioskKnife[];
+  locked: boolean;
+}) {
   const router = useRouter();
   const [now, setNow] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
 
   useEffect(() => {
     setNow(Date.now());
@@ -65,18 +72,37 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1 gap-3">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <span aria-hidden>🔪</span> Safety Knife Status Board
         </h1>
-        <Link href="/" className="text-slate-400 text-sm hover:text-white">
-          Exit kiosk ✕
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setLockDialogOpen(true)}
+            className={`text-sm rounded-lg px-3 py-1.5 border ${
+              locked
+                ? "bg-amber-500/20 border-amber-500 text-amber-200 hover:bg-amber-500/30"
+                : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+            }`}
+          >
+            {locked ? "🔒 Locked — Unlock" : "🔓 Lock kiosk"}
+          </button>
+          <Link href="/" className="text-slate-400 text-sm hover:text-white">
+            Exit kiosk ✕
+          </Link>
+        </div>
       </div>
-      <p className="text-slate-400 text-sm mb-4">
-        Tap a knife to check out, check in, or mark cleaned — you&apos;ll confirm with your PIN.
-        QA and admin actions use the main board.
-      </p>
+      {locked ? (
+        <p className="text-amber-300 text-sm mb-4 flex items-center gap-2">
+          <span aria-hidden>🔒</span> View-only — a supervisor has locked the kiosk. Actions are
+          disabled until it&apos;s unlocked.
+        </p>
+      ) : (
+        <p className="text-slate-400 text-sm mb-4">
+          Tap a knife to check out, check in, or mark cleaned — you&apos;ll confirm with your PIN.
+          QA and admin actions use the main board.
+        </p>
+      )}
 
       {/* Big status counts */}
       <div className="flex flex-wrap gap-3 mb-5">
@@ -104,8 +130,10 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
         {withState.map(({ k, state }) => (
           <button
             key={k.id}
-            onClick={() => setSelectedId(k.id)}
-            className={`aspect-square rounded-2xl border-2 flex items-center justify-center text-2xl font-bold transition ${STATUS_META[state].tile}`}
+            onClick={() => !locked && setSelectedId(k.id)}
+            className={`aspect-square rounded-2xl border-2 flex items-center justify-center text-2xl font-bold transition ${
+              STATUS_META[state].tile
+            } ${locked ? "cursor-default" : ""}`}
             title={`#${k.number} — ${STATUS_META[state].label}`}
           >
             #{k.number}
@@ -113,7 +141,7 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
         ))}
       </div>
 
-      {selected && (
+      {selected && !locked && (
         <KioskModal
           knife={selected}
           state={stateOf(selected, now || Date.now())}
@@ -124,6 +152,121 @@ export default function KioskBoard({ knives }: { knives: KioskKnife[] }) {
           }}
         />
       )}
+
+      {lockDialogOpen && (
+        <LockDialog
+          locked={locked}
+          onClose={() => setLockDialogOpen(false)}
+          onDone={() => {
+            setLockDialogOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function LockDialog({
+  locked,
+  onClose,
+  onDone,
+}: {
+  locked: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const nextLocked = !locked;
+
+  function submit() {
+    setError(null);
+    start(async () => {
+      const res = await setKioskLockedWithPin(nextLocked, pin);
+      if (res.ok) onDone();
+      else {
+        setError(res.error ?? "Failed.");
+        setPin("");
+      }
+    });
+  }
+
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white text-slate-900 w-full max-w-sm rounded-2xl shadow-xl p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">
+            {nextLocked ? "Lock kiosk" : "Unlock kiosk"}
+          </h2>
+          <button onClick={onClose} className="text-slate-400 text-3xl leading-none px-2">
+            ×
+          </button>
+        </div>
+        <p className="text-sm text-slate-600 mb-4">
+          {nextLocked
+            ? "Puts the kiosk in view-only mode. Enter an admin PIN to confirm."
+            : "Re-enables check out / check in / clean. Enter an admin PIN to confirm."}
+        </p>
+        <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
+          {pin.replace(/./g, "•") || (
+            <span className="text-slate-300 tracking-normal text-base">admin PIN</span>
+          )}
+        </div>
+        {error && (
+          <p className="text-center text-sm text-red-600 mb-3" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="grid grid-cols-3 gap-2">
+          {keys.map((d) => (
+            <button
+              key={d}
+              onClick={() => {
+                setError(null);
+                setPin((p) => (p.length >= 8 ? p : p + d));
+              }}
+              className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
+            >
+              {d}
+            </button>
+          ))}
+          <button
+            onClick={() => setPin((p) => p.slice(0, -1))}
+            className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-lg"
+            aria-label="Delete"
+          >
+            ⌫
+          </button>
+          <button
+            onClick={() => {
+              setError(null);
+              setPin((p) => (p.length >= 8 ? p : p + "0"));
+            }}
+            className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
+          >
+            0
+          </button>
+          <button
+            onClick={submit}
+            disabled={pending || pin.length === 0}
+            className={`h-14 rounded-lg text-white font-semibold disabled:opacity-50 ${
+              nextLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+            }`}
+          >
+            {pending ? "…" : nextLocked ? "Lock" : "Unlock"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

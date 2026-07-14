@@ -6,6 +6,7 @@ import {
   getCheckoutWindowHours,
   getRecentEvents,
   getEmailSettings,
+  getKioskLocked,
 } from "@/lib/data";
 import { ACTION_LABEL } from "@/lib/status";
 import { AdminPanel } from "@/components/AdminPanel";
@@ -28,11 +29,12 @@ export default async function AdminPage() {
     );
   }
 
-  const [workers, hours, events, emailSettings] = await Promise.all([
+  const [workers, hours, events, emailSettings, kioskLocked] = await Promise.all([
     getWorkers(),
     getCheckoutWindowHours(),
     getRecentEvents(50),
     getEmailSettings(),
+    getKioskLocked(),
   ]);
 
   return (
@@ -46,6 +48,7 @@ export default async function AdminPage() {
 
       <AdminPanel
         checkoutWindowHours={hours}
+        kioskLocked={kioskLocked}
         emailSettings={emailSettings}
         workers={workers.map((w) => ({
           id: w.id,
