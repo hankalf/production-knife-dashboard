@@ -305,6 +305,44 @@ export async function setWorkerActive(
   return ok();
 }
 
+// Email alert *preferences* only — delivery is not wired up yet, so this
+// simply persists what an admin wants; nothing is sent.
+export async function updateEmailSettings(input: {
+  enabled: boolean;
+  recipients: string;
+  notifyOverdue: boolean;
+  notifyDailySweep: boolean;
+}): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  if (!auth.ok) return fail(auth.error);
+
+  const recipients = input.recipients
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const bad = recipients.find((r) => !emailRe.test(r));
+  if (bad) return fail(`"${bad}" is not a valid email address.`);
+  if (input.enabled && recipients.length === 0) {
+    return fail("Add at least one recipient before enabling email alerts.");
+  }
+  if (input.enabled && !input.notifyOverdue && !input.notifyDailySweep) {
+    return fail("Choose at least one thing to be notified about.");
+  }
+
+  const entries: [string, string][] = [
+    ["email.enabled", String(input.enabled)],
+    ["email.recipients", recipients.join(",")],
+    ["email.notifyOverdue", String(input.notifyOverdue)],
+    ["email.notifyDailySweep", String(input.notifyDailySweep)],
+  ];
+  for (const [key, value] of entries) {
+    await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+  }
+  revalidatePath("/", "layout");
+  return ok();
+}
+
 export async function updateCheckoutWindow(hours: number): Promise<ActionResult> {
   const auth = await requireWorkerWithRole(ROLE.ADMIN);
   if (!auth.ok) return fail(auth.error);

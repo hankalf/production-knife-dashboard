@@ -7,8 +7,10 @@ import {
   addWorker,
   setWorkerActive,
   updateCheckoutWindow,
+  updateEmailSettings,
   type ActionResult,
 } from "@/app/actions";
+import type { EmailSettings } from "@/lib/data";
 
 const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "ADMIN"];
 
@@ -16,17 +18,22 @@ type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 
 export function AdminPanel({
   checkoutWindowHours,
+  emailSettings,
   workers,
 }: {
   checkoutWindowHours: number;
+  emailSettings: EmailSettings;
   workers: WorkerRow[];
 }) {
   return (
-    <div className="grid md:grid-cols-2 gap-6">
-      <AddKnifeCard />
-      <CheckoutWindowCard hours={checkoutWindowHours} />
-      <AddWorkerCard />
-      <WorkersCard workers={workers} />
+    <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-6">
+        <AddKnifeCard />
+        <CheckoutWindowCard hours={checkoutWindowHours} />
+        <AddWorkerCard />
+        <WorkersCard workers={workers} />
+      </div>
+      <EmailAlertsCard settings={emailSettings} />
     </div>
   );
 }
@@ -178,6 +185,82 @@ function AddWorkerCard() {
           Add worker
         </button>
       </div>
+      <Msg msg={msg} />
+    </Card>
+  );
+}
+
+function EmailAlertsCard({ settings }: { settings: EmailSettings }) {
+  const { pending, msg, run } = useRun();
+  const [enabled, setEnabled] = useState(settings.enabled);
+  const [recipients, setRecipients] = useState(settings.recipients);
+  const [notifyOverdue, setNotifyOverdue] = useState(settings.notifyOverdue);
+  const [notifyDailySweep, setNotifyDailySweep] = useState(settings.notifyDailySweep);
+
+  return (
+    <Card title="Email alerts">
+      <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <span className="font-medium">Not connected yet.</span> These preferences are
+        saved, but no emails are sent until email delivery is wired up. This screen sets up
+        who would be notified and about what.
+      </div>
+
+      <label className="flex items-center gap-3 mb-4">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="w-5 h-5"
+        />
+        <span className="font-medium">Enable email alerts (once delivery is connected)</span>
+      </label>
+
+      <label className="block text-sm text-slate-600 mb-1">
+        Recipients (comma or newline separated)
+      </label>
+      <textarea
+        value={recipients}
+        onChange={(e) => setRecipients(e.target.value)}
+        placeholder="qa-lead@plant.com, floor-supervisor@plant.com"
+        rows={2}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4"
+      />
+
+      <fieldset className="mb-4">
+        <legend className="text-sm text-slate-600 mb-2">Notify when…</legend>
+        <label className="flex items-center gap-3 mb-2">
+          <input
+            type="checkbox"
+            checked={notifyOverdue}
+            onChange={(e) => setNotifyOverdue(e.target.checked)}
+            className="w-5 h-5"
+          />
+          <span>A knife goes overdue (out past its time limit)</span>
+        </label>
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={notifyDailySweep}
+            onChange={(e) => setNotifyDailySweep(e.target.checked)}
+            className="w-5 h-5"
+          />
+          <span>End-of-day sweep — knives still checked out at shift close</span>
+        </label>
+      </fieldset>
+
+      <button
+        onClick={() =>
+          run(
+            () =>
+              updateEmailSettings({ enabled, recipients, notifyOverdue, notifyDailySweep }),
+            "Email preferences saved."
+          )
+        }
+        disabled={pending}
+        className="rounded-lg bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 disabled:opacity-50"
+      >
+        Save preferences
+      </button>
       <Msg msg={msg} />
     </Card>
   );

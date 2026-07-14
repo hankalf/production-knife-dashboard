@@ -41,7 +41,7 @@ can return it, so returns are attributed to the right person.
   plus fleet metrics: average sanitation→QA turnaround, QA fail rate, and most-used knives.
 - **`/kiosk`** — full-screen, read-only status board for a wall-mounted display (auto-refreshes).
 - **`/admin`** *(admin)* — add knives, retire/restore, manage workers, set the time limit,
-  and export the full audit log to CSV.
+  export the full audit log to CSV, and configure **email alerts** (see below).
 - **`/knife/<number>`** — a single knife's complete lifecycle history.
 
 ## Tech stack
@@ -93,7 +93,17 @@ Every transition writes an immutable `KnifeEvent` (knife, action, from/to status
 timestamp, note). View a single knife's history at `/knife/<number>`, or export the full
 log to CSV from the Admin screen (`/api/export`).
 
+## Email alerts (setup only — delivery not connected yet)
+
+The Admin screen has an **Email alerts** panel where you can set the recipient
+addresses and choose what to be notified about (a knife going overdue, and/or the
+end-of-day sweep of knives still checked out). These preferences are saved to the
+`Setting` store (`email.*` keys), but **no emails are sent yet** — the sending layer
+(SMTP/provider + a scheduled job for the daily sweep) is intentionally left unwired.
+Hooking it up later means reading these settings and adding a mailer; the config UI is
+already in place.
+
 ## Ideas reserved for later
 
 - QR/barcode scanning — the schema already has a `scanCode` field per knife.
-- End-of-day sweep report, fleet turnaround metrics, and a wall-mounted kiosk view.
+- Connecting the email/SMS delivery layer to the alert preferences above.

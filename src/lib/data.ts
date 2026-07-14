@@ -6,6 +6,32 @@ export async function getCheckoutWindowHours(): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 24;
 }
 
+export type EmailSettings = {
+  enabled: boolean;
+  recipients: string; // raw comma-separated list
+  notifyOverdue: boolean;
+  notifyDailySweep: boolean;
+};
+
+const EMAIL_KEYS = [
+  "email.enabled",
+  "email.recipients",
+  "email.notifyOverdue",
+  "email.notifyDailySweep",
+] as const;
+
+export async function getEmailSettings(): Promise<EmailSettings> {
+  const rows = await prisma.setting.findMany({ where: { key: { in: [...EMAIL_KEYS] } } });
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  return {
+    enabled: map.get("email.enabled") === "true",
+    recipients: map.get("email.recipients") ?? "",
+    // categories default to on so they're pre-checked when first enabling
+    notifyOverdue: (map.get("email.notifyOverdue") ?? "true") === "true",
+    notifyDailySweep: (map.get("email.notifyDailySweep") ?? "true") === "true",
+  };
+}
+
 export async function getKnives() {
   return prisma.knife.findMany({
     orderBy: { sortKey: "asc" },

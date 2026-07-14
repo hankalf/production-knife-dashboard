@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { getCurrentWorker } from "@/lib/session";
 import { hasRole } from "@/lib/status";
-import { getWorkers, getCheckoutWindowHours, getRecentEvents } from "@/lib/data";
+import {
+  getWorkers,
+  getCheckoutWindowHours,
+  getRecentEvents,
+  getEmailSettings,
+} from "@/lib/data";
 import { ACTION_LABEL } from "@/lib/status";
 import { AdminPanel } from "@/components/AdminPanel";
 
@@ -23,10 +28,11 @@ export default async function AdminPage() {
     );
   }
 
-  const [workers, hours, events] = await Promise.all([
+  const [workers, hours, events, emailSettings] = await Promise.all([
     getWorkers(),
     getCheckoutWindowHours(),
     getRecentEvents(50),
+    getEmailSettings(),
   ]);
 
   return (
@@ -40,6 +46,7 @@ export default async function AdminPage() {
 
       <AdminPanel
         checkoutWindowHours={hours}
+        emailSettings={emailSettings}
         workers={workers.map((w) => ({
           id: w.id,
           name: w.name,
