@@ -74,16 +74,33 @@ right person.
 - **PostgreSQL + Prisma** — managed database with versioned migrations
 - **Tailwind CSS** — touch-friendly, tablet-first UI
 
-## Getting started
+## Run it on Docker Desktop (whole app)
 
-You need a PostgreSQL database. The quickest way locally is the bundled Docker Compose file:
+With Docker Desktop running, one command builds the app image and starts it alongside
+PostgreSQL:
 
 ```bash
-docker compose up -d      # starts Postgres on localhost:5432 (matches .env)
+docker compose up --build
+```
+
+Then open **http://localhost:3000**. On first boot the app applies the database migrations
+and seeds the fleet automatically, so it's ready to use. Sign in with the default PINs below.
+
+- Data persists in the `knife_pgdata` volume across restarts.
+- Stop with `Ctrl+C` (or `docker compose down`); wipe the database with `docker compose down -v`.
+- Rebuild after code changes with `docker compose up --build`.
+
+## Getting started (local dev without Docker for the app)
+
+You need a PostgreSQL database. The quickest way is to run **just the database** from the
+compose file and develop the app with `npm run dev`:
+
+```bash
+docker compose up db -d    # starts Postgres on localhost:5432 (matches .env)
 npm install
-npm run db:migrate        # apply migrations (creates the tables)
-npm run db:seed           # seed 42 knives (1–14, 51–64, 65–78) + starter workers
-npm run dev               # http://localhost:3000
+npm run db:migrate         # apply migrations (creates the tables)
+npm run db:seed            # seed 42 knives (1–14, 51–64, 65–78) + starter workers
+npm run dev                # http://localhost:3000
 ```
 
 Already have a Postgres you'd rather use? Put its connection string in `DATABASE_URL`

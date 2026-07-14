@@ -1,5 +1,8 @@
-# Local Postgres for development. Matches the DATABASE_URL in .env.
-# Start it with:  docker compose up -d
+# Full stack for Docker Desktop:  docker compose up --build
+#   - db:  PostgreSQL 16 (data persisted in a named volume)
+#   - app: the Next.js app; on boot it migrates + seeds, then serves on :3000
+#
+# For local `npm run dev` against just the database, run:  docker compose up db
 services:
   db:
     image: postgres:16
@@ -12,6 +15,24 @@ services:
       - "5432:5432"
     volumes:
       - knife_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knife -d knifedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Point at the db service (not localhost) inside the Docker network.
+      DATABASE_URL: "postgresql://knife:knife@db:5432/knifedb?schema=public"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   knife_pgdata:
