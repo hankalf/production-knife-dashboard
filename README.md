@@ -122,6 +122,23 @@ Already have a Postgres you'd rather use? Put its connection string in `DATABASE
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
 
+## Deploy on Render (Blueprint)
+
+The repo includes a `render.yaml` Blueprint that provisions the web service **and** a
+PostgreSQL database together.
+
+1. Push this repo to GitHub (done).
+2. In [Render](https://render.com): **New → Blueprint**, connect this repo, pick the branch,
+   and **Apply**. Render reads `render.yaml` and creates the `safety-knife-checkout` web
+   service plus the `knife-db` Postgres, wiring `DATABASE_URL` automatically.
+3. On first deploy the app applies migrations and seeds the fleet, then serves. Open the
+   service URL Render gives you and sign in with the default PINs (Admin `0000`, Operator
+   `1111`, Sanitation `2222`, QA `3333`).
+
+The Blueprint uses Render's **free** plans by default; note free web services sleep after
+inactivity and free databases expire after 90 days — bump the `plan:` values in `render.yaml`
+for anything long-lived.
+
 ## Deploy on Railway
 
 Railway gives you a public URL you can open on any device (including a floor tablet), and
