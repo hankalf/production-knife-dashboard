@@ -5,7 +5,7 @@ services:
   - type: web
     name: safety-knife-checkout
     runtime: node
-    plan: free
+    plan: starter
     region: oregon
     # --include=dev ensures build-only tools (TypeScript, Tailwind) are present
     # even though Render sets NODE_ENV=production.
@@ -24,7 +24,7 @@ services:
 
 databases:
   - name: knife-db
-    plan: free
+    plan: basic-256mb
     region: oregon
     databaseName: knifedb
     user: knife

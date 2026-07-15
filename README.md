@@ -135,9 +135,9 @@ PostgreSQL database together.
    service URL Render gives you and sign in with the default PINs (Admin `0000`, Operator
    `1111`, Sanitation `2222`, QA `3333`).
 
-The Blueprint uses Render's **free** plans by default; note free web services sleep after
-inactivity and free databases expire after 90 days — bump the `plan:` values in `render.yaml`
-for anything long-lived.
+The Blueprint uses Render's entry **paid** plans — `starter` for the web service and
+`basic-256mb` for Postgres — so the service stays awake and the database is persistent (no
+free-tier sleep or 90-day expiry). Bump the `plan:` values in `render.yaml` to size up.
 
 ## Deploy on Railway
 
