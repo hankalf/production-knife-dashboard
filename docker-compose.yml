@@ -29,7 +29,9 @@ services:
       DATABASE_URL: "postgresql://knife:knife@db:5432/knifedb?schema=public"
       NODE_ENV: production
     ports:
-      - "3000:3000"
+      # Served on port 80 so the URL needs no ":3000".
+      # Reach it at http://localhost or, with a LAN name, http://knives.local
+      - "80:3000"
     depends_on:
       db:
         condition: service_healthy

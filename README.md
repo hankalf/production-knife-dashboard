@@ -83,12 +83,27 @@ PostgreSQL:
 docker compose up --build
 ```
 
-Then open **http://localhost:3000**. On first boot the app applies the database migrations
+Then open **http://localhost**. On first boot the app applies the database migrations
 and seeds the fleet automatically, so it's ready to use. Sign in with the default PINs below.
 
+- The app is published on **port 80**, so no `:3000` is needed in the URL.
 - Data persists in the `knife_pgdata` volume across restarts.
 - Stop with `Ctrl+C` (or `docker compose down`); wipe the database with `docker compose down -v`.
 - Rebuild after code changes with `docker compose up --build`.
+
+### A custom hostname on your LAN (e.g. `http://knives.local`)
+
+Docker serves the app on port 80; the friendly **name** is resolved by your network. Point a
+name at the Docker host with any one of:
+
+- **mDNS** — name the host machine `knives`; it answers as `knives.local` on the LAN (no config
+  on most networks).
+- **Local DNS** — add a record on your router or Pi-hole/AdGuard: `knives.lan` → host IP.
+- **Hosts file** — on a device, add `‹host-ip›  knives.local` to `/etc/hosts` (or the Windows
+  hosts file).
+
+Then browse to `http://knives.local`. (For a clean hostname **with HTTPS**, see the Caddy
+reverse-proxy variant on the `claude/docker-url-caddy` branch.)
 
 ## Getting started (local dev without Docker for the app)
 
