@@ -74,21 +74,45 @@ right person.
 - **PostgreSQL + Prisma** — managed database with versioned migrations
 - **Tailwind CSS** — touch-friendly, tablet-first UI
 
-## Run it on Docker Desktop (whole app)
+## Run it on Docker Desktop (app + Postgres + Caddy)
 
-With Docker Desktop running, one command builds the app image and starts it alongside
-PostgreSQL:
+This branch fronts the app with a **Caddy** reverse proxy so you get a clean hostname with
+**HTTPS** on your LAN — no `:3000` in the URL. One command builds and starts everything:
 
 ```bash
 docker compose up --build
 ```
 
-Then open **http://localhost:3000**. On first boot the app applies the database migrations
-and seeds the fleet automatically, so it's ready to use. Sign in with the default PINs below.
+On first boot the app applies migrations and seeds the fleet automatically. Then reach it at
+**https://knives.local** (see hostname setup below). Sign in with the default PINs below.
 
-- Data persists in the `knife_pgdata` volume across restarts.
-- Stop with `Ctrl+C` (or `docker compose down`); wipe the database with `docker compose down -v`.
+- **Caddy** listens on ports **80/443** and proxies to the app; `http://` redirects to `https://`.
+- Data persists in `knife_pgdata`; Caddy's local CA persists in `caddy_data`.
+- Stop with `Ctrl+C` (or `docker compose down`); wipe everything with `docker compose down -v`.
 - Rebuild after code changes with `docker compose up --build`.
+
+### Point the hostname at the Docker host
+
+Docker serves it; your network resolves the **name**. Use any one of:
+
+- **mDNS** — name the host machine `knives`; it answers as `knives.local` on the LAN.
+- **Local DNS** — add a record on your router or Pi-hole/AdGuard: `knives.local` → host IP.
+- **Hosts file** — add `‹host-ip›  knives.local` to `/etc/hosts` (or the Windows hosts file).
+
+To use a **different name**, edit the hostname in `./Caddyfile` and restart.
+
+### About the HTTPS certificate
+
+Caddy issues the cert from its **own local CA** (`tls internal`), so browsers show a warning
+until you trust that CA. Either **accept the warning** (fine for internal use), or trust
+Caddy's root once: copy it out and install it on your devices —
+
+```bash
+docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
+```
+
+then add `caddy-root.crt` to your OS/browser trusted roots. After that, `https://knives.local`
+shows a normal padlock.
 
 ## Getting started (local dev without Docker for the app)
 

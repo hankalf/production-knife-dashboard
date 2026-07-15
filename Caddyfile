@@ -1,0 +1,12 @@
+# Caddy config for a clean local hostname with HTTPS.
+# Change "knives.local" below to whatever name you point at this host.
+#
+# `tls internal` makes Caddy issue the certificate from its own local CA — great
+# for a LAN. Browsers will warn until you trust Caddy's root CA (see the README),
+# or you can just accept the warning. Plain http:// redirects to https://.
+
+knives.local {
+	tls internal
+	encode gzip
+	reverse_proxy app:3000
+}

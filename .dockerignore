@@ -6,6 +6,7 @@ npm-debug.log*
 Dockerfile
 .dockerignore
 docker-compose.yml
+Caddyfile
 README.md
 .env
 *.md

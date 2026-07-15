@@ -1,6 +1,12 @@
-# Full stack for Docker Desktop:  docker compose up --build
-#   - db:  PostgreSQL 16 (data persisted in a named volume)
-#   - app: the Next.js app; on boot it migrates + seeds, then serves on :3000
+# Full stack + Caddy reverse proxy for a clean local hostname with HTTPS.
+#   docker compose up --build   →   https://knives.local  (and http:// redirects to it)
+#
+#   - db:    PostgreSQL 16 (data persisted in a named volume)
+#   - app:   the Next.js app; migrates + seeds on boot, serves on :3000 (internal only)
+#   - caddy: reverse proxy on ports 80/443, terminates HTTPS with a local CA
+#
+# Point the hostname (default knives.local — edit ./Caddyfile to change it) at this
+# Docker host via mDNS, your router/Pi-hole DNS, or a hosts-file entry. See the README.
 #
 # For local `npm run dev` against just the database, run:  docker compose up db
 services:
@@ -25,14 +31,27 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      # Point at the db service (not localhost) inside the Docker network.
       DATABASE_URL: "postgresql://knife:knife@db:5432/knifedb?schema=public"
       NODE_ENV: production
-    ports:
-      - "3000:3000"
+    # No host port — traffic comes through Caddy on the internal network (app:3000).
     depends_on:
       db:
         condition: service_healthy
 
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
 volumes:
   knife_pgdata:
+  caddy_data:
+  caddy_config:
