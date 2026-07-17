@@ -24,8 +24,8 @@ export function Legend() {
         ))}
       </div>
       <p className="mt-3 text-xs text-slate-400">
-        Lifecycle: Available → Checked out → Awaiting sanitation → Awaiting QA → Available.
-        A knife can only be checked out after passing QA.
+        Lifecycle: Available → Checked out → Awaiting sanitation → Available.
+        Cleaning returns a knife straight to service.
       </p>
     </div>
   );

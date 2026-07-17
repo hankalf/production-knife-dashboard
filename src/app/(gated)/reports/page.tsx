@@ -38,13 +38,12 @@ export default async function ReportsPage() {
         <MetricCard
           label="Avg turnaround"
           value={formatDuration(metrics.avgTurnaroundMs)}
-          sub={`${metrics.cyclesMeasured} clean+QA cycle${metrics.cyclesMeasured === 1 ? "" : "s"}`}
+          sub={`${metrics.cyclesMeasured} cleaning cycle${metrics.cyclesMeasured === 1 ? "" : "s"}`}
         />
         <MetricCard
-          label="QA fail rate"
-          value={metrics.qaFailRate == null ? "—" : `${Math.round(metrics.qaFailRate * 100)}%`}
-          accent={metrics.qaFailRate && metrics.qaFailRate > 0.15 ? "text-orange-600" : undefined}
-          sub={`${metrics.qaPass} pass · ${metrics.qaFail} fail`}
+          label="Cleanings"
+          value={String(metrics.cleans)}
+          sub="all time"
         />
       </div>
 

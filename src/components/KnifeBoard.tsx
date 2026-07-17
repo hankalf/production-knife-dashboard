@@ -14,13 +14,10 @@ import {
   checkoutKnife,
   returnKnife,
   cleanKnife,
-  qaPassKnife,
-  qaFailKnife,
   retireKnife,
   restoreKnife,
   setKnifeType,
   batchClean,
-  batchQaPass,
   type ActionResult,
   type BatchResult,
 } from "@/app/actions";
@@ -71,9 +68,7 @@ export default function KnifeBoard({
   // Which batch action, if any, the current worker can run in the current filter.
   const batchOption = useMemo(() => {
     if (filter === "DIRTY" && roles.includes("SANITATION"))
-      return { status: "DIRTY", label: "Mark cleaned", fn: batchClean };
-    if (filter === "CLEANED" && roles.includes("QA"))
-      return { status: "CLEANED", label: "Pass QA", fn: batchQaPass };
+      return { status: "DIRTY", label: "Clean & return to service", fn: batchClean };
     return null;
   }, [filter, roles]);
 
@@ -328,7 +323,6 @@ function KnifeModal({
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
 
   function run(fn: () => Promise<ActionResult>) {
     setError(null);
@@ -424,45 +418,20 @@ function KnifeModal({
               </ActionButton>
             )}
 
-            {is === "DIRTY" && has("SANITATION") && (
+            {(is === "DIRTY" || is === "CLEANED") && has("SANITATION") && (
               <ActionButton
                 pending={pending}
                 onClick={() => run(() => cleanKnife(knife.id))}
                 className="bg-violet-600 hover:bg-violet-700"
               >
-                Mark cleaned
+                Clean &amp; return to service
               </ActionButton>
-            )}
-
-            {is === "CLEANED" && has("QA") && (
-              <>
-                <ActionButton
-                  pending={pending}
-                  onClick={() => run(() => qaPassKnife(knife.id))}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  QA pass → back in service
-                </ActionButton>
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Reason (required to fail)"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                />
-                <ActionButton
-                  pending={pending}
-                  onClick={() => run(() => qaFailKnife(knife.id, reason))}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  QA fail → back to sanitation
-                </ActionButton>
-              </>
             )}
 
             {(has("ADMIN") || has("QA")) && is !== "OUT_OF_SERVICE" && (
               <ActionButton
                 pending={pending}
-                onClick={() => run(() => retireKnife(knife.id, reason))}
+                onClick={() => run(() => retireKnife(knife.id, ""))}
                 className="bg-slate-600 hover:bg-slate-700"
               >
                 Retire (out of service)

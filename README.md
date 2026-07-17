@@ -1,22 +1,19 @@
 # Safety Knife Checkout System
 
 A tablet-first web app for tracking pre-numbered food-production safety knives through
-their full lifecycle: **operator checkout → sanitation cleaning → QA inspection → back in
-service**. A knife can only be checked out after it has passed QA, and any knife kept out
-past its time limit (default one day) is flagged overdue. Every action is recorded for
-food-safety auditing.
+their full lifecycle: **operator checkout → sanitation cleaning → back in service**. A knife
+kept out past its time limit (default one day) is flagged overdue. Every action is recorded
+for food-safety auditing.
 
 ## Lifecycle
 
 ```
 AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)──▶ DIRTY
    ▲                                                                   │
-   │                                                          clean(sanitation)
-   │                                                                   ▼
-   └────────────────── QA pass(QA) ◀───────────────────────────── CLEANED
-                                                                       ▲
-                                        QA fail(QA) ───────────────────┘ (back to DIRTY)
+   └──────────────── clean & return to service(sanitation) ◀──────────┘
 ```
+
+Cleaning returns a knife straight to service — there is no separate QA-inspection step.
 
 - **Overdue** is derived (a checked-out knife past its due time), shown in red with a banner.
 - **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
@@ -33,8 +30,8 @@ action modal (admin/QA). New knives default to FC.
 | Role | Can do |
 |------|--------|
 | Operator | Check out an available knife; return **their own** checked-out knife after use |
-| Sanitation | Mark used (dirty) knives cleaned — one at a time or in a batch |
-| QA | Pass cleaned knives back into service (single or batch), or fail one (with a reason) back to sanitation; open the admin panel |
+| Sanitation | Clean used (dirty) knives, returning them straight to service — one at a time or in a batch |
+| QA | Supervisory role with admin-panel access (there is no separate QA inspection step) |
 | Admin | **Everything** — all operator/sanitation/QA functions, plus add knives, retire/restore, manage workers & PINs, set the time limit, lock the kiosk, and export the audit log |
 
 A worker can hold multiple roles, and **admins implicitly have every capability**. Only the
@@ -57,7 +54,7 @@ right person.
 - **`/`** — live color-coded fleet board; tap a knife to act on it. Sanitation/QA get a
   **batch mode** to clear many knives at once.
 - **`/reports`** *(any signed-in worker)* — end-of-day sweep of everything still checked out,
-  plus fleet metrics: average sanitation→QA turnaround, QA fail rate, and most-used knives.
+  plus fleet metrics: average return→clean turnaround, total cleanings, and most-used knives.
 - **`/kiosk`** — full-screen status board for a wall-mounted display (auto-refreshes).
   Floor staff can check out, check in, and mark cleaned right on the kiosk, confirming
   each action with their PIN and optionally **adding a note** (e.g. sanitation flagging

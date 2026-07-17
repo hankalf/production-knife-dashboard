@@ -19,11 +19,9 @@ export async function getCheckedOutReport() {
 
 export type FleetMetrics = {
   totalCheckouts: number;
-  qaPass: number;
-  qaFail: number;
-  qaFailRate: number | null; // 0..1
+  cleans: number;
   cyclesMeasured: number;
-  avgTurnaroundMs: number | null; // return -> back in service
+  avgTurnaroundMs: number | null; // return -> cleaned & back in service
   mostUsed: { number: string; count: number }[];
 };
 
@@ -39,8 +37,7 @@ export async function getMetrics(): Promise<FleetMetrics> {
   const numById = new Map(knives.map((k) => [k.id, k.number]));
 
   const checkoutCount = new Map<number, number>();
-  let qaPass = 0;
-  let qaFail = 0;
+  let cleans = 0;
   const lastReturn = new Map<number, Date>();
   const turnarounds: number[] = [];
 
@@ -50,14 +47,13 @@ export async function getMetrics(): Promise<FleetMetrics> {
         checkoutCount.set(e.knifeId, (checkoutCount.get(e.knifeId) ?? 0) + 1);
         break;
       case "RETURN":
-        // Start of the sanitation+QA turnaround clock for this knife.
+        // Start of the sanitation turnaround clock for this knife.
         lastReturn.set(e.knifeId, e.createdAt);
         break;
-      case "QA_FAIL":
-        qaFail++;
-        break;
+      // CLEAN now completes the cycle (QA_PASS kept for historical events).
+      case "CLEAN":
       case "QA_PASS": {
-        qaPass++;
+        if (e.action === "CLEAN") cleans++;
         const r = lastReturn.get(e.knifeId);
         if (r) {
           turnarounds.push(e.createdAt.getTime() - r.getTime());
@@ -69,7 +65,6 @@ export async function getMetrics(): Promise<FleetMetrics> {
   }
 
   const totalCheckouts = [...checkoutCount.values()].reduce((a, b) => a + b, 0);
-  const qaTotal = qaPass + qaFail;
   const avgTurnaroundMs = turnarounds.length
     ? turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length
     : null;
@@ -80,9 +75,7 @@ export async function getMetrics(): Promise<FleetMetrics> {
 
   return {
     totalCheckouts,
-    qaPass,
-    qaFail,
-    qaFailRate: qaTotal ? qaFail / qaTotal : null,
+    cleans,
     cyclesMeasured: turnarounds.length,
     avgTurnaroundMs,
     mostUsed,

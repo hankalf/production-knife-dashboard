@@ -194,12 +194,40 @@ async function kioskOpts(action: "CHECKOUT" | "RETURN" | "CLEAN", actor: Actor):
           : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
     };
   }
+  // Cleaning returns the knife straight to service (no separate QA step).
+  // CLEANED is accepted as a source for any legacy knives stuck in that state.
   return {
     action: "CLEAN",
-    from: [STATUS.DIRTY],
-    to: STATUS.CLEANED,
+    from: [STATUS.DIRTY, STATUS.CLEANED],
+    to: STATUS.AVAILABLE,
     role: ROLE.SANITATION,
   };
+}
+
+// Step 1 of the kiosk flow: verify the PIN and return who this is, so the
+// worker can confirm their name before the action executes. Nothing changes yet.
+export async function kioskIdentify(
+  knifeId: number,
+  action: "CHECKOUT" | "RETURN" | "CLEAN",
+  pin: string
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
+  if (locked?.value === "true") {
+    return { ok: false, error: "The kiosk is locked. Ask a supervisor to unlock it." };
+  }
+  const clean = (pin || "").trim();
+  if (!clean) return { ok: false, error: "Enter your PIN." };
+  const workers = await prisma.worker.findMany({ where: { active: true } });
+  const worker = workers.find((w) => verifyPin(clean, w.pin));
+  if (!worker) return { ok: false, error: "PIN not recognized." };
+
+  // Check the role fits the action now, so a wrong-role PIN fails at this
+  // step rather than after the worker confirms their name.
+  const opts = await kioskOpts(action, { workerId: worker.id, roles: worker.roles });
+  if (!hasRole(worker.roles, opts.role)) {
+    return { ok: false, error: `This action requires the ${opts.role} role.` };
+  }
+  return { ok: true, name: worker.name };
 }
 
 // ---- Kiosk lock (supervisor view-only toggle) -----------------------------
@@ -287,38 +315,19 @@ export async function returnKnife(knifeId: number): Promise<ActionResult> {
   });
 }
 
+// Cleaning returns the knife straight to service — there is no separate QA
+// step. CLEANED is accepted as a source for legacy knives stuck in that state.
 export async function cleanKnife(knifeId: number): Promise<ActionResult> {
   return transition(knifeId, {
     action: "CLEAN",
-    from: [STATUS.DIRTY],
-    to: STATUS.CLEANED,
-    role: ROLE.SANITATION,
-  });
-}
-
-export async function qaPassKnife(knifeId: number): Promise<ActionResult> {
-  return transition(knifeId, {
-    action: "QA_PASS",
-    from: [STATUS.CLEANED],
+    from: [STATUS.DIRTY, STATUS.CLEANED],
     to: STATUS.AVAILABLE,
-    role: ROLE.QA,
+    role: ROLE.SANITATION,
     data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
   });
 }
 
-export async function qaFailKnife(knifeId: number, reason: string): Promise<ActionResult> {
-  const note = (reason || "").trim();
-  if (!note) return fail("A reason is required to fail QA.");
-  return transition(knifeId, {
-    action: "QA_FAIL",
-    from: [STATUS.CLEANED],
-    to: STATUS.DIRTY,
-    role: ROLE.QA,
-    note,
-  });
-}
-
-// ---- Batch actions (sanitation / QA move many knives at once) --------------
+// ---- Batch actions (sanitation moves many knives at once) ------------------
 
 export type BatchResult = { ok: boolean; done: number; failed: number; error?: string };
 
@@ -342,10 +351,6 @@ async function runBatch(
 
 export async function batchClean(ids: number[]): Promise<BatchResult> {
   return runBatch(ids, cleanKnife);
-}
-
-export async function batchQaPass(ids: number[]): Promise<BatchResult> {
-  return runBatch(ids, qaPassKnife);
 }
 
 export async function retireKnife(knifeId: number, reason: string): Promise<ActionResult> {
