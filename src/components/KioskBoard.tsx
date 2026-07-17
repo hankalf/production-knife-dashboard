@@ -10,7 +10,7 @@ import {
   normalizeType,
   type DisplayState,
 } from "@/lib/status";
-import { kioskAct, setKioskLockedWithPin } from "@/app/actions";
+import { kioskAct, kioskIdentify, setKioskLockedWithPin } from "@/app/actions";
 
 export type KioskKnife = {
   id: number;
@@ -35,9 +35,10 @@ function kioskActionFor(status: string): { action: KioskAction; label: string; r
     case "CHECKED_OUT":
       return { action: "RETURN", label: "Check in (return)", role: "Operator" };
     case "DIRTY":
-      return { action: "CLEAN", label: "Mark cleaned", role: "Sanitation" };
+    case "CLEANED": // legacy state — cleaning also returns these to service
+      return { action: "CLEAN", label: "Clean & return to service", role: "Sanitation" };
     default:
-      return null; // CLEANED (QA) and OUT_OF_SERVICE are handled on the main board
+      return null; // OUT_OF_SERVICE is handled on the main board
   }
 }
 
@@ -106,8 +107,8 @@ export default function KioskBoard({
         </p>
       ) : (
         <p className="text-slate-400 text-sm mb-4">
-          Tap a knife to check out, check in, or mark cleaned — you&apos;ll confirm with your PIN.
-          QA and admin actions use the main board.
+          Tap a knife, enter your PIN, and confirm your name — the app runs the right action
+          for your role (operators check out / in, sanitation cleans &amp; returns to service).
         </p>
       )}
 
@@ -294,23 +295,53 @@ function KioskModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  // Two-step flow: enter PIN → verify it's really you (name check) → the
+  // role-appropriate action runs.
+  const [step, setStep] = useState<"pin" | "confirm">("pin");
   const [pin, setPin] = useState("");
+  const [workerName, setWorkerName] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const act = kioskActionFor(knife.status);
 
-  function submit() {
+  // Step 1: verify the PIN and find out who it belongs to.
+  function identify() {
+    if (!act) return;
+    setError(null);
+    start(async () => {
+      const res = await kioskIdentify(knife.id, act.action, pin);
+      if (res.ok) {
+        setWorkerName(res.name);
+        setStep("confirm");
+      } else {
+        setError(res.error);
+        setPin("");
+      }
+    });
+  }
+
+  // Step 2: the worker confirmed it's them — run the action.
+  function execute() {
     if (!act) return;
     setError(null);
     start(async () => {
       const res = await kioskAct(knife.id, act.action, pin, note);
       if (res.ok) onDone();
       else {
+        // e.g. state changed since identify, or lock flipped on
         setError(res.error ?? "Action failed.");
+        setStep("pin");
         setPin("");
       }
     });
+  }
+
+  function notMe() {
+    setStep("pin");
+    setPin("");
+    setWorkerName(null);
+    setError(null);
   }
 
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
@@ -337,30 +368,14 @@ function KioskModal({
 
         {!act ? (
           <p className="text-slate-600">
-            No kiosk action for this knife.{" "}
-            {knife.status === "CLEANED"
-              ? "It's awaiting QA — handle it on the main board."
-              : "It's out of service."}
+            No kiosk action for this knife — it&apos;s out of service.
           </p>
-        ) : (
+        ) : step === "pin" ? (
           <>
             <div className="rounded-lg bg-slate-100 px-4 py-3 mb-4 text-center">
               <div className="text-lg font-semibold">{act.label}</div>
-              <div className="text-xs text-slate-500">Enter your {act.role} PIN to confirm</div>
+              <div className="text-xs text-slate-500">Enter your {act.role} PIN</div>
             </div>
-
-            <label className="block text-sm text-slate-600 mb-1">
-              {act.action === "CLEAN"
-                ? "Note (optional — e.g. residue found, extra sanitizing)"
-                : "Note (optional)"}
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Add a note if needed…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
-            />
 
             <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
               {pin.replace(/./g, "•") || (
@@ -402,11 +417,59 @@ function KioskModal({
                 0
               </button>
               <button
-                onClick={submit}
+                onClick={identify}
                 disabled={pending || pin.length === 0}
                 className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
               >
-                {pending ? "…" : "Confirm"}
+                {pending ? "…" : "Next"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Step 2: confirm identity, then act */}
+            <div className="rounded-lg bg-slate-100 px-4 py-4 mb-4 text-center">
+              <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                Verify it&apos;s you
+              </div>
+              <div className="text-2xl font-bold">{workerName}</div>
+              <div className="text-sm text-slate-600 mt-2">
+                {act.label} — knife #{knife.number}
+              </div>
+            </div>
+
+            <label className="block text-sm text-slate-600 mb-1">
+              {act.action === "CLEAN"
+                ? "Note (optional — e.g. residue found, extra sanitizing)"
+                : "Note (optional)"}
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Add a note if needed…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
+            />
+
+            {error && (
+              <p className="text-center text-sm text-red-600 mb-3" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={notMe}
+                disabled={pending}
+                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50"
+              >
+                Not me
+              </button>
+              <button
+                onClick={execute}
+                disabled={pending}
+                className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
+              >
+                {pending ? "…" : `Yes, that's me — ${act.action === "CLEAN" ? "clean" : act.action === "CHECKOUT" ? "check out" : "check in"}`}
               </button>
             </div>
           </>

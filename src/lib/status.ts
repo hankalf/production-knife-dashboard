@@ -78,8 +78,10 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
     tile: "bg-orange-500 hover:bg-orange-600 text-white border-orange-600",
     dot: "bg-orange-500",
   },
+  // Legacy state from when a QA-inspection step existed; kept so any knife
+  // still in this state renders (sanitation can clean it back to Available).
   CLEANED: {
-    label: "Awaiting QA",
+    label: "Cleaned (legacy)",
     tile: "bg-violet-500 hover:bg-violet-600 text-white border-violet-600",
     dot: "bg-violet-500",
   },
@@ -90,13 +92,13 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
   },
 };
 
-// Order the legend / summary counts follow.
+// Order the legend / summary counts follow. (CLEANED is legacy-only and
+// intentionally omitted — cleaning now returns a knife straight to Available.)
 export const DISPLAY_ORDER: DisplayState[] = [
   "AVAILABLE",
   "CHECKED_OUT",
   "OVERDUE",
   "DIRTY",
-  "CLEANED",
   "OUT_OF_SERVICE",
 ];
 
@@ -144,7 +146,8 @@ export function effectiveRoles(roles: string): Role[] {
 export const ACTION_LABEL: Record<string, string> = {
   CHECKOUT: "Checked out",
   RETURN: "Returned (used)",
-  CLEAN: "Cleaned",
+  CLEAN: "Cleaned & returned to service",
+  // Historical actions from when a QA-inspection step existed.
   QA_PASS: "QA passed",
   QA_FAIL: "QA failed",
   RETIRE: "Retired",
