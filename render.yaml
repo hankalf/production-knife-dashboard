@@ -21,6 +21,11 @@ services:
           property: connectionString
       - key: NODE_VERSION
         value: "22"
+      # Timezone for due-date math ("end of today" / "end of Friday").
+      # Change this to the plant's local zone (IANA name) — default UTC is
+      # almost never what you want for shift cut-offs.
+      - key: TZ
+        value: "America/Chicago"
 
 databases:
   - name: knife-db

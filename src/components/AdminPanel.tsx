@@ -26,15 +26,18 @@ const INPUT =
 
 type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 type KnifeRow = { id: number; number: string; type: string; status: string };
+type SystemInfo = { timeZone: string; serverTime: string };
 
 export function AdminPanel({
   logoDataUrl,
   knives,
+  system,
   teamsSettings,
   workers,
 }: {
   logoDataUrl: string | null;
   knives: KnifeRow[];
+  system: SystemInfo;
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
@@ -44,7 +47,7 @@ export function AdminPanel({
         <KnivesCard knives={knives} />
         <WorkersAndAddCard workers={workers} />
       </div>
-      <AdvancedCard logoDataUrl={logoDataUrl} teamsSettings={teamsSettings} />
+      <AdvancedCard logoDataUrl={logoDataUrl} system={system} teamsSettings={teamsSettings} />
     </div>
   );
 }
@@ -77,12 +80,15 @@ function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
   );
 }
 
-// Advanced settings: Teams notifications and the kiosk company logo.
+// Advanced settings: Teams notifications, the kiosk company logo, and a
+// read-only system readout (timezone that drives due dates).
 function AdvancedCard({
   logoDataUrl,
+  system,
   teamsSettings,
 }: {
   logoDataUrl: string | null;
+  system: SystemInfo;
   teamsSettings: TeamsSettings;
 }) {
   return (
@@ -90,7 +96,31 @@ function AdvancedCard({
       <TeamsSection settings={teamsSettings} />
       <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
       <LogoSection logoDataUrl={logoDataUrl} />
+      <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+      <SystemSection system={system} />
     </Card>
+  );
+}
+
+function SystemSection({ system }: { system: SystemInfo }) {
+  return (
+    <div>
+      <h3 className="font-semibold mb-1">System</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+        Due dates are calculated in this timezone — FC knives are due end of day, NFC knives end
+        of Friday. Set the <code>TZ</code> environment variable to your plant&apos;s zone.
+      </p>
+      <dl className="text-sm space-y-1">
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-500 dark:text-slate-400">Timezone</dt>
+          <dd className="font-medium tabular-nums">{system.timeZone}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-500 dark:text-slate-400">Server time now</dt>
+          <dd className="font-medium tabular-nums">{system.serverTime}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 

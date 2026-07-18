@@ -32,6 +32,7 @@ export type KnifeDTO = {
   checkedOutAtMs: number | null;
   holderName: string | null;
   damageNote: string | null;
+  damagePhoto: string | null;
 };
 
 function computeDisplayState(k: KnifeDTO, now: number): DisplayState {
@@ -391,6 +392,16 @@ function KnifeModal({
         {is === "DAMAGED" && knife.damageNote && (
           <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
             <span className="font-semibold">Reported damage:</span> {knife.damageNote}
+            {knife.damagePhoto && (
+              <a href={knife.damagePhoto} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={knife.damagePhoto}
+                  alt={`Damage on knife #${knife.number}`}
+                  className="max-h-48 w-auto rounded border border-rose-300 dark:border-rose-900"
+                />
+              </a>
+            )}
           </div>
         )}
 

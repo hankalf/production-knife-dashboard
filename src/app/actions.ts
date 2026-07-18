@@ -294,6 +294,7 @@ export type CleanAnswers = {
   inspected: boolean;
   condition: "GOOD" | "DAMAGED";
   damageReason?: string;
+  damagePhoto?: string; // optional data-URL photo (downscaled client-side)
 };
 
 // Sanitation cleaning with the 4-question inspection checklist. A "Good"
@@ -314,6 +315,13 @@ export async function kioskClean(
 
   if (answers.condition === "DAMAGED") {
     if (!reason) return fail("Describe the damage before submitting.");
+    const photo = (answers.damagePhoto || "").trim();
+    if (photo) {
+      if (!/^data:image\/(png|jpe?g|webp);base64,/.test(photo)) {
+        return fail("Damage photo must be a PNG, JPG, or WEBP image.");
+      }
+      if (photo.length > 1_400_000) return fail("Damage photo is too large.");
+    }
     const res = await applyTransition(
       knifeId,
       {
@@ -321,7 +329,7 @@ export async function kioskClean(
         from: [STATUS.DIRTY, STATUS.CLEANED],
         to: STATUS.DAMAGED,
         role: ROLE.SANITATION,
-        data: { damageNote: reason, checkedOutById: null, checkedOutAt: null, dueAt: null },
+        data: { damageNote: reason, damagePhoto: photo || null, checkedOutById: null, checkedOutAt: null, dueAt: null },
         note: `Cleaned: ${answers.cleaned ? "Y" : "N"}, Inspected: ${answers.inspected ? "Y" : "N"}, Condition: Damaged — ${reason}`,
       },
       actor
@@ -352,7 +360,7 @@ export async function kioskClean(
       from: [STATUS.DIRTY, STATUS.CLEANED],
       to: STATUS.AVAILABLE,
       role: ROLE.SANITATION,
-      data: { damageNote: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
+      data: { damageNote: null, damagePhoto: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
       note: "Cleaned: Y, Inspected: Y, Condition: Good",
     },
     actor
@@ -370,7 +378,7 @@ export async function returnDamagedToService(knifeId: number): Promise<ActionRes
       from: [STATUS.DAMAGED],
       to: STATUS.AVAILABLE,
       role: ROLE.ADMIN,
-      data: { damageNote: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
+      data: { damageNote: null, damagePhoto: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
     },
     { workerId: auth.workerId, roles: auth.roles }
   );
@@ -461,6 +469,7 @@ export async function retireKnife(knifeId: number, reason: string): Promise<Acti
       data: {
         retiredAt: new Date(),
         damageNote: null,
+        damagePhoto: null,
         checkedOutById: null,
         checkedOutAt: null,
         dueAt: null,

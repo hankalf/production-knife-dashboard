@@ -42,6 +42,34 @@ function shortName(full: string): string {
   return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
 }
 
+// Downscale a captured photo to a small JPEG data URL so it fits in the DB
+// setting/column without needing object storage. Camera shots are multi-MB;
+// this caps the longest edge and re-encodes as JPEG.
+async function downscalePhoto(file: File, maxDim = 1024, quality = 0.7): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = dataUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
 
 function kioskActionFor(status: string): { action: KioskAction; label: string; role: string } | null {
@@ -378,6 +406,22 @@ function CleanChecklist({
   const [inspected, setInspected] = useState<boolean | null>(null);
   const [condition, setCondition] = useState<"GOOD" | "DAMAGED" | null>(null);
   const [reason, setReason] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      setPhoto(await downscalePhoto(file));
+    } catch {
+      setPhoto(null);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   const ready =
     cleaned !== null &&
@@ -446,7 +490,31 @@ function CleanChecklist({
             placeholder="Describe the damage… · Describa el daño…"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
-          <p className="text-xs text-rose-600 mt-1">
+
+          {/* Optional photo of the damage. */}
+          <div className="mt-2">
+            <div className="text-sm font-medium mb-1">Photo (optional) · Foto (opcional)</div>
+            {photo ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo} alt="Damage" className="h-16 w-16 rounded object-cover border border-slate-300" />
+                <button
+                  type="button"
+                  onClick={() => setPhoto(null)}
+                  className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
+                >
+                  Remove · Quitar
+                </button>
+              </div>
+            ) : (
+              <label className="inline-flex items-center gap-2 text-sm rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 cursor-pointer">
+                {photoBusy ? "…" : "📷 Add photo · Agregar foto"}
+                <input type="file" accept="image/*" capture="environment" onChange={onPhoto} className="hidden" />
+              </label>
+            )}
+          </div>
+
+          <p className="text-xs text-rose-600 mt-2">
             A manager must return this knife to service. · Un gerente debe devolverlo al servicio.
           </p>
         </div>
@@ -465,9 +533,10 @@ function CleanChecklist({
               inspected: inspected === true,
               condition: condition ?? "GOOD",
               damageReason: reason,
+              damagePhoto: photo ?? undefined,
             })
           }
-          disabled={pending || !ready}
+          disabled={pending || !ready || photoBusy}
           className="h-12 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
         >
           {pending ? "…" : "Submit · Enviar"}

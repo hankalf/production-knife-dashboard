@@ -30,3 +30,8 @@ next-env.d.ts
 /prisma/*.db
 /prisma/*.db-journal
 *.sqlite
+/backups/
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
