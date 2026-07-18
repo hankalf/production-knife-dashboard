@@ -67,7 +67,8 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
   CHECKED_OUT: {
     label: "Checked out",
     tile: "bg-sky-500 hover:bg-sky-600 text-white border-sky-600",
-    dot: "bg-sky-500",
+    // Bright yellow so the status dot stays visible on the blue/silver kiosk bubbles.
+    dot: "bg-yellow-300",
   },
   OVERDUE: {
     label: "Overdue",
