@@ -552,6 +552,71 @@ export async function setKnifeType(knifeId: number, type: string): Promise<Actio
   return ok();
 }
 
+// Edit a knife's number and/or type from the admin panel.
+export async function updateKnifeDetails(
+  knifeId: number,
+  input: { number: string; type: string }
+): Promise<ActionResult> {
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  const label = (input.number || "").trim();
+  if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
+  const sortKey = Number(label);
+  const knifeType = input.type === "NFC" ? "NFC" : "FC";
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const knife = await tx.knife.findUnique({ where: { id: knifeId } });
+      if (!knife) throw new Error("Knife not found.");
+      if (label !== knife.number) {
+        const clash = await tx.knife.findUnique({ where: { number: label } });
+        if (clash) throw new Error(`Knife #${label} already exists.`);
+      }
+      if (label === knife.number && knifeType === knife.type) return;
+      await tx.knife.update({
+        where: { id: knifeId },
+        data: { number: label, sortKey, type: knifeType },
+      });
+      await tx.knifeEvent.create({
+        data: {
+          knifeId,
+          workerId: auth.workerId,
+          action: "EDIT",
+          fromStatus: knife.status,
+          toStatus: knife.status,
+          note: `Edited: #${knife.number} (${knife.type}) → #${label} (${knifeType})`,
+        },
+      });
+    });
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : "Could not update knife.");
+  }
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+// Permanently delete a knife and its audit history. For mis-added knives;
+// use Retire to take a real knife out of service while keeping its history.
+export async function deleteKnife(knifeId: number): Promise<ActionResult> {
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  try {
+    const knife = await prisma.knife.findUnique({ where: { id: knifeId } });
+    if (!knife) return fail("Knife not found.");
+    if (knife.status === STATUS.CHECKED_OUT) {
+      return fail("Return this knife before removing it.");
+    }
+    await prisma.$transaction([
+      prisma.knifeEvent.deleteMany({ where: { knifeId } }),
+      prisma.knife.delete({ where: { id: knifeId } }),
+    ]);
+  } catch {
+    return fail("Could not remove knife.");
+  }
+  revalidatePath("/", "layout");
+  return ok();
+}
+
 export async function addWorker(
   name: string,
   pin: string,

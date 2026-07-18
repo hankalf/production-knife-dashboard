@@ -12,39 +12,182 @@ import {
   sendTeamsTest,
   bulkAddWorkers,
   updateLogo,
+  updateKnifeDetails,
+  deleteKnife,
   type ActionResult,
 } from "@/app/actions";
+import { STATUS_META, TYPE_META, normalizeType, type DisplayState } from "@/lib/status";
 import type { TeamsSettings } from "@/lib/data";
 
 const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "ADMIN"];
+const TYPES = ["FC", "NFC"] as const;
 const INPUT =
   "w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2";
 
 type WorkerRow = { id: number; name: string; roles: string; active: boolean };
+type KnifeRow = { id: number; number: string; type: string; status: string };
 
 export function AdminPanel({
   logoDataUrl,
+  knives,
   teamsSettings,
   workers,
 }: {
   logoDataUrl: string | null;
+  knives: KnifeRow[];
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
-        <AddKnifeCard />
+        <KnifeAndLogoCard logoDataUrl={logoDataUrl} />
         <AddWorkerCard />
         <WorkersCard workers={workers} />
-        <BrandingCard logoDataUrl={logoDataUrl} />
+        <KnivesCard knives={knives} />
       </div>
       <TeamsCard settings={teamsSettings} />
     </div>
   );
 }
 
-function BrandingCard({ logoDataUrl }: { logoDataUrl: string | null }) {
+function KnivesCard({ knives }: { knives: KnifeRow[] }) {
+  return (
+    <Card title={`Knife fleet (${knives.length})`}>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes its
+        history — to take a real knife out of rotation, use <strong>Retire</strong> on the board.
+      </p>
+      <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
+        {knives.map((k) => (
+          <KnifeRowItem key={k.id} knife={k} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function KnifeRowItem({ knife }: { knife: KnifeRow }) {
+  const { pending, msg, run } = useRun();
+  const [editing, setEditing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [number, setNumber] = useState(knife.number);
+  const [type, setType] = useState<"FC" | "NFC">(normalizeType(knife.type));
+
+  function reset() {
+    setNumber(knife.number);
+    setType(normalizeType(knife.type));
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <li className="py-3 space-y-2">
+        <input
+          value={number}
+          onChange={(e) => setNumber(e.target.value)}
+          inputMode="numeric"
+          placeholder="Knife number"
+          className={INPUT}
+        />
+        <div className="flex gap-2">
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`flex-1 rounded-lg py-1.5 text-sm font-medium border ${
+                type === t
+                  ? `${TYPE_META[t].badge} border-transparent`
+                  : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              {t === "FC" ? "Food Contact" : "Non-Food Contact"}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() =>
+              run(() => updateKnifeDetails(knife.id, { number, type }), `Knife #${number} updated.`, () => setEditing(false))
+            }
+            disabled={pending}
+            className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm disabled:opacity-50"
+          >
+            Save
+          </button>
+          <button onClick={reset} className="rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 px-4 py-2 text-sm">
+            Cancel
+          </button>
+        </div>
+        <Msg msg={msg} />
+      </li>
+    );
+  }
+
+  return (
+    <li className="py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">#{knife.number}</span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_META[normalizeType(knife.type)].badge}`}>
+            {TYPE_META[normalizeType(knife.type)].short}
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            <span className={`inline-block w-2 h-2 rounded-full ${STATUS_META[knife.status as DisplayState]?.dot ?? "bg-slate-400"}`} />
+            {STATUS_META[knife.status as DisplayState]?.label ?? knife.status}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1 justify-end">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
+          >
+            Edit
+          </button>
+          {confirmRemove ? (
+            <>
+              <button
+                onClick={() => run(() => deleteKnife(knife.id), `Knife #${knife.number} removed.`, () => setConfirmRemove(false))}
+                disabled={pending}
+                className="text-sm rounded-lg px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirmRemove(false)}
+                className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
+              >
+                No
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirmRemove(true)}
+              className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 hover:text-red-700"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <Msg msg={msg} />
+    </li>
+  );
+}
+
+// One admin card holding both "Add a knife" and "Kiosk logo".
+function KnifeAndLogoCard({ logoDataUrl }: { logoDataUrl: string | null }) {
+  return (
+    <Card title="Knives & kiosk logo">
+      <AddKnifeSection />
+      <div className="my-4 border-t border-slate-100 dark:border-slate-700" />
+      <LogoSection logoDataUrl={logoDataUrl} />
+    </Card>
+  );
+}
+
+function LogoSection({ logoDataUrl }: { logoDataUrl: string | null }) {
   const { pending, msg, run } = useRun();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -64,7 +207,8 @@ function BrandingCard({ logoDataUrl }: { logoDataUrl: string | null }) {
   }
 
   return (
-    <Card title="Kiosk logo">
+    <div>
+      <h3 className="font-semibold mb-1">Kiosk logo</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Shown in the top-left corner of the kiosk board. PNG, JPG, or SVG under 500&nbsp;KB.
       </p>
@@ -99,7 +243,7 @@ function BrandingCard({ logoDataUrl }: { logoDataUrl: string | null }) {
         </div>
       </div>
       <Msg msg={msg} />
-    </Card>
+    </div>
   );
 }
 
@@ -139,12 +283,13 @@ function Msg({ msg }: { msg: { ok: boolean; text: string } | null }) {
   );
 }
 
-function AddKnifeCard() {
+function AddKnifeSection() {
   const { pending, msg, run } = useRun();
   const [number, setNumber] = useState("");
   const [type, setType] = useState<"FC" | "NFC">("FC");
   return (
-    <Card title="Add a knife">
+    <div>
+      <h3 className="font-semibold mb-1">Add a knife</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         New knives enter the fleet as Available.
       </p>
@@ -183,7 +328,7 @@ function AddKnifeCard() {
         ))}
       </div>
       <Msg msg={msg} />
-    </Card>
+    </div>
   );
 }
 
