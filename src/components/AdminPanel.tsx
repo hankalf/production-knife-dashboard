@@ -12,7 +12,6 @@ import {
   sendTeamsTest,
   bulkAddWorkers,
   updateLogo,
-  setKioskLocked,
   type ActionResult,
 } from "@/app/actions";
 import type { TeamsSettings } from "@/lib/data";
@@ -24,12 +23,10 @@ const INPUT =
 type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 
 export function AdminPanel({
-  kioskLocked,
   logoDataUrl,
   teamsSettings,
   workers,
 }: {
-  kioskLocked: boolean;
   logoDataUrl: string | null;
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
@@ -38,7 +35,6 @@ export function AdminPanel({
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         <AddKnifeCard />
-        <KioskLockCard locked={kioskLocked} />
         <AddWorkerCard />
         <WorkersCard workers={workers} />
         <BrandingCard logoDataUrl={logoDataUrl} />
@@ -185,39 +181,6 @@ function AddKnifeCard() {
             {t === "FC" ? "Food Contact" : "Non-Food Contact"}
           </button>
         ))}
-      </div>
-      <Msg msg={msg} />
-    </Card>
-  );
-}
-
-function KioskLockCard({ locked }: { locked: boolean }) {
-  const { pending, msg, run } = useRun();
-  return (
-    <Card title="Kiosk mode">
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        The wall-display kiosk lets floor staff check out, check in, and clean with their PIN.
-        Lock it to make the kiosk view-only.
-      </p>
-      <div className="flex items-center gap-3">
-        <span
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
-            locked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-          }`}
-        >
-          {locked ? "🔒 Locked (view-only)" : "🔓 Interactive"}
-        </span>
-        <button
-          onClick={() =>
-            run(() => setKioskLocked(!locked), `Kiosk ${locked ? "unlocked" : "locked"}.`)
-          }
-          disabled={pending}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            locked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
-          }`}
-        >
-          {locked ? "Unlock kiosk" : "Lock kiosk"}
-        </button>
       </div>
       <Msg msg={msg} />
     </Card>

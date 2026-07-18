@@ -17,6 +17,7 @@ export default async function KioskPage() {
     status: k.status,
     type: k.type,
     dueAtMs: k.dueAt ? k.dueAt.getTime() : null,
+    holderName: k.checkedOutBy?.name ?? null,
   }));
   return <KioskBoard knives={dto} locked={locked} logoDataUrl={logoDataUrl} />;
 }

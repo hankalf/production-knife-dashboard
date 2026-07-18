@@ -57,7 +57,7 @@ default to FC.
 | Operator | Check out an available knife; return **their own** checked-out knife after use (kiosk only) |
 | Sanitation | Clean & inspect used (dirty) knives via the checklist, returning good ones to service |
 | QA | Supervisory role with fleet-board and admin-panel access |
-| Admin (manager) | **Everything** — all operator/sanitation functions, return **damaged** knives to service, plus add knives, retire/restore, manage workers & PINs, lock the kiosk, configure Teams alerts, and export the audit log |
+| Admin (manager) | **Everything** — all operator/sanitation functions, return **damaged** knives to service, plus add knives, retire/restore, manage workers & PINs, upload the kiosk logo, configure Teams alerts, and export the audit log |
 
 A worker can hold multiple roles, and **admins implicitly have every capability**. Only the
 operator who checked a knife out (or an admin) can return it, so returns are attributed to the
@@ -86,9 +86,9 @@ surfaces are gated very differently:
   metrics: average return→clean turnaround, total cleanings, and most-used knives.
 - **`/kiosk`** — full-screen, **bilingual (English + Spanish)** floor surface for the shared
   iPad (auto-refreshes). Employees check out, check in, and clean+inspect knives right on the
-  kiosk, confirming each action with their PIN and optionally **adding a note** that lands in
-  the audit trail. Cleaning runs the 4-question sanitation checklist. (A supervisor can still
-  lock the kiosk to view-only from **Admin → Kiosk mode**; it's enforced server-side.)
+  kiosk, confirming each action with their PIN. A checked-out knife's bubble shows **who has
+  it out**. Cleaning runs the 4-question sanitation checklist. An optional **company logo**
+  shows in the top-left corner.
 - **`/admin`** *(admin/QA)* — add knives, retire/restore, manage workers (including
   **CSV bulk upload**), upload a **company logo** for the kiosk, configure **Teams alerts**
   (see below), export the full audit log to CSV, and toggle **light/dark mode** from the
