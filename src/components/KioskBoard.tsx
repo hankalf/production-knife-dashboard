@@ -124,102 +124,94 @@ export default function KioskBoard({
   const selected = knives.find((k) => k.id === selectedId) ?? null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-3 sm:p-5 lg:p-6 overflow-auto">
-      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2 sm:gap-3 mb-1">
-        {logoDataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logoDataUrl}
-            alt="Company logo"
-            className="h-8 sm:h-10 w-auto max-w-[140px] sm:max-w-[180px] object-contain rounded bg-white/5 p-0.5"
-          />
-        ) : (
-          <span aria-hidden>🔪</span>
-        )}
-        Safety Knife Check-in / Checkout
-      </h1>
+    <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-3 lg:p-4 overflow-hidden">
+      {/* Compact top bar: title + counts + legend on one row so the grid gets
+          the rest of the (landscape) screen height. */}
+      <div className="flex items-center flex-wrap gap-x-5 gap-y-1 mb-2">
+        <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
+          {logoDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoDataUrl}
+              alt="Company logo"
+              className="h-8 lg:h-9 w-auto max-w-[160px] object-contain rounded bg-white/5 p-0.5"
+            />
+          ) : (
+            <span aria-hidden>🔪</span>
+          )}
+          Safety Knife Check-in / Checkout
+        </h1>
+        <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
+          {DISPLAY_ORDER.map((s) => (
+            <div
+              key={s}
+              className="flex items-center gap-1.5 rounded-lg bg-slate-900 border border-slate-800 px-2 py-1 text-xs lg:text-sm"
+            >
+              <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[s].dot}`} />
+              <span className="text-slate-300">{STATUS_META[s].label}</span>
+              <span className="text-base lg:text-lg font-bold tabular-nums">{counts[s] ?? 0}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {locked ? (
-        <p className="text-amber-300 text-sm mb-4">
+        <p className="text-amber-300 text-xs lg:text-sm mb-1">
           🔒 View-only — the kiosk is locked. · Solo lectura — el kiosco está bloqueado.
         </p>
       ) : (
-        <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-          Tap a knife, enter your PIN, and confirm your name.
-          <br />
-          <span className="text-slate-500">
-            Toque un cuchillo, ingrese su PIN y confirme su nombre.
-          </span>
+        <p className="text-slate-400 text-xs lg:text-sm mb-1">
+          Tap a knife, enter your PIN, and confirm your name. · Toque un cuchillo, ingrese su PIN y
+          confirme su nombre.
         </p>
       )}
 
-      {/* Status counts */}
-      <div className="flex flex-wrap gap-1.5 sm:gap-3 mb-3 sm:mb-5 text-xs sm:text-base">
-        {DISPLAY_ORDER.map((s) => (
-          <div
-            key={s}
-            className="flex items-center gap-1.5 sm:gap-3 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-800 px-2.5 py-1.5 sm:px-4 sm:py-3"
-          >
-            <span className={`inline-block w-3 h-3 sm:w-4 sm:h-4 rounded-full ${STATUS_META[s].dot}`} />
-            <span className="text-slate-300">{STATUS_META[s].label}</span>
-            <span className="text-lg sm:text-2xl font-bold tabular-nums">{counts[s] ?? 0}</span>
-          </div>
-        ))}
-      </div>
-
       {overdue.length > 0 && (
-        <div className="mb-5 rounded-xl bg-red-950 border border-red-700 px-5 py-4 text-red-200 text-xl font-semibold flex items-center gap-3">
-          <span aria-hidden className="text-2xl">⚠️</span>
+        <div className="mb-2 rounded-lg bg-red-950 border border-red-700 px-3 py-2 text-red-200 text-base lg:text-lg font-semibold flex items-center gap-2">
+          <span aria-hidden>⚠️</span>
           {overdue.length} OVERDUE / VENCIDO — {overdue.map((n) => `#${n}`).join("  ")}
         </div>
       )}
 
-      {/* Type legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 sm:mb-3 text-xs sm:text-sm">
-        <span className="flex items-center gap-2">
-          <span className="inline-block w-3 h-3 sm:w-4 sm:h-4 rounded bg-blue-600 border border-blue-700" />
-          Food Contact / Contacto con alimentos
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="inline-block w-3 h-3 sm:w-4 sm:h-4 rounded bg-slate-300 border border-slate-400" />
-          Non-Food Contact / Sin contacto con alimentos
-        </span>
-      </div>
-
-      {/* Grid — always 14 columns so each numbered group (1–14, 51–64, 65–78)
-          fills exactly one row. Tiles are aspect-square in a fluid grid, so they
-          auto-size to the screen; the text scales with clamp() for any iPad. */}
-      <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 sm:gap-1.5 lg:gap-2 content-start">
-        {withState.map(({ k, state }) => (
-          <button
-            key={k.id}
-            onClick={() => !locked && setSelectedId(k.id)}
-            className={`relative aspect-square rounded-md sm:rounded-lg lg:rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
-              k.type
-            )} ${state === "OVERDUE" ? "ring-2 sm:ring-4 ring-red-500" : ""} ${locked ? "cursor-default" : ""}`}
-            title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
-          >
-            <span className="leading-none font-extrabold" style={{ fontSize: "clamp(0.65rem, 2.1vw, 1.5rem)" }}>
-              #{k.number}
-            </span>
-            <span
-              className="w-full px-0.5 text-center font-bold uppercase tracking-tight leading-[1.05]"
-              style={{ fontSize: "clamp(0.4rem, 1.05vw, 0.8rem)" }}
+      {/* Grid — always 14 columns × 3 rows so each numbered group (1–14, 51–64,
+          65–78) is exactly one row. The grid keeps a 14:3 aspect ratio and is
+          capped by both the width and the remaining height, so the bubbles grow
+          as large as possible and the whole board fits a landscape iPad with no
+          scrolling. Text scales with vmin so it tracks the bubble size. */}
+      <div className="flex-1 min-h-0">
+        <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-x-1.5 lg:gap-x-2 h-full w-full content-around">
+          {withState.map(({ k, state }) => (
+            <button
+              key={k.id}
+              onClick={() => !locked && setSelectedId(k.id)}
+              className={`relative aspect-square rounded-lg lg:rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
+                k.type
+              )} ${state === "OVERDUE" ? "ring-2 lg:ring-4 ring-red-500" : ""} ${locked ? "cursor-default" : ""}`}
+              title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
-              {TYPE_META[normalizeType(k.type)].label}
-            </span>
-            {/* who has it checked out */}
-            {k.status === "CHECKED_OUT" && k.holderName && (
-              <span
-                className="mt-0.5 w-full truncate px-1 text-center font-medium leading-tight"
-                style={{ fontSize: "clamp(0.4rem, 0.95vw, 0.7rem)" }}
-              >
-                {shortName(k.holderName)}
+              <span className="leading-none font-extrabold" style={{ fontSize: "clamp(0.8rem, 3.4vmin, 2.2rem)" }}>
+                #{k.number}
               </span>
+              <span
+                className="w-full px-0.5 text-center font-bold uppercase tracking-tight leading-[1.05]"
+                style={{ fontSize: "clamp(0.45rem, 1.7vmin, 1rem)" }}
+              >
+                {TYPE_META[normalizeType(k.type)].label}
+              </span>
+              {/* who has it checked out */}
+              {k.status === "CHECKED_OUT" && k.holderName && (
+                <span
+                  className="mt-0.5 w-full truncate px-1 text-center font-medium leading-tight"
+                  style={{ fontSize: "clamp(0.45rem, 1.5vmin, 0.85rem)" }}
+                >
+                  {shortName(k.holderName)}
+                </span>
             )}
-            {/* status dot */}
-            <span className={`absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-3 sm:h-3 rounded-full ring-1 ring-black/20 ${STATUS_META[state].dot}`} />
-          </button>
-        ))}
+              {/* status dot */}
+              <span className={`absolute top-0.5 right-0.5 lg:top-1 lg:right-1 w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 rounded-full ring-1 ring-black/20 ${STATUS_META[state].dot}`} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {selected && !locked && (
