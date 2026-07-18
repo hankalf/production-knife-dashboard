@@ -41,18 +41,29 @@ export function AdminPanel({
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
-        <KnifeAndLogoCard logoDataUrl={logoDataUrl} />
-        <WorkersAndAddCard workers={workers} />
         <KnivesCard knives={knives} />
+        <WorkersAndAddCard workers={workers} />
       </div>
-      <TeamsCard settings={teamsSettings} />
+      <AdvancedCard logoDataUrl={logoDataUrl} teamsSettings={teamsSettings} />
     </div>
   );
 }
 
+// Knives management: add a knife and manage the whole fleet in one card.
 function KnivesCard({ knives }: { knives: KnifeRow[] }) {
   return (
-    <Card title={`Knife fleet (${knives.length})`}>
+    <Card title="Knives">
+      <AddKnifeSection />
+      <div className="my-4 border-t border-slate-100 dark:border-slate-700" />
+      <KnifeFleetSection knives={knives} />
+    </Card>
+  );
+}
+
+function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
+  return (
+    <div>
+      <h3 className="font-semibold mb-1">Knife fleet ({knives.length})</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes its
         history — to take a real knife out of rotation, use <strong>Retire</strong> on the board.
@@ -62,6 +73,23 @@ function KnivesCard({ knives }: { knives: KnifeRow[] }) {
           <KnifeRowItem key={k.id} knife={k} />
         ))}
       </ul>
+    </div>
+  );
+}
+
+// Advanced settings: Teams notifications and the kiosk company logo.
+function AdvancedCard({
+  logoDataUrl,
+  teamsSettings,
+}: {
+  logoDataUrl: string | null;
+  teamsSettings: TeamsSettings;
+}) {
+  return (
+    <Card title="Advanced">
+      <TeamsSection settings={teamsSettings} />
+      <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+      <LogoSection logoDataUrl={logoDataUrl} />
     </Card>
   );
 }
@@ -172,17 +200,6 @@ function KnifeRowItem({ knife }: { knife: KnifeRow }) {
       </div>
       <Msg msg={msg} />
     </li>
-  );
-}
-
-// One admin card holding both "Add a knife" and "Kiosk logo".
-function KnifeAndLogoCard({ logoDataUrl }: { logoDataUrl: string | null }) {
-  return (
-    <Card title="Knives & kiosk logo">
-      <AddKnifeSection />
-      <div className="my-4 border-t border-slate-100 dark:border-slate-700" />
-      <LogoSection logoDataUrl={logoDataUrl} />
-    </Card>
   );
 }
 
@@ -461,7 +478,7 @@ function AddWorkerSection() {
   );
 }
 
-function TeamsCard({ settings }: { settings: TeamsSettings }) {
+function TeamsSection({ settings }: { settings: TeamsSettings }) {
   const { pending, msg, run } = useRun();
   const [enabled, setEnabled] = useState(settings.enabled);
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
@@ -469,7 +486,8 @@ function TeamsCard({ settings }: { settings: TeamsSettings }) {
   const [notifyOverdue, setNotifyOverdue] = useState(settings.notifyOverdue);
 
   return (
-    <Card title="Microsoft Teams notifications">
+    <div>
+      <h3 className="font-semibold mb-1">Microsoft Teams notifications</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Paste an <strong>Incoming Webhook</strong> URL from your Teams channel. When a knife is
         flagged <strong>damaged</strong>, a message is posted to that channel so a manager can
@@ -523,7 +541,7 @@ function TeamsCard({ settings }: { settings: TeamsSettings }) {
         </button>
       </div>
       <Msg msg={msg} />
-    </Card>
+    </div>
   );
 }
 
