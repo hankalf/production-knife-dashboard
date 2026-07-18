@@ -10,7 +10,7 @@ import {
   setAdminGate,
   clearAdminGate,
 } from "@/lib/session";
-import { getCheckoutWindowHours } from "@/lib/data";
+import { computeDueDate } from "@/lib/schedule";
 import { ROLE, STATUS, hasRole, canAccessAdmin, type Role } from "@/lib/status";
 
 export type ActionResult = { ok: boolean; error?: string };
@@ -167,52 +167,28 @@ async function actorFromPin(pin: string): Promise<Actor | null> {
   return worker ? { workerId: worker.id, roles: worker.roles } : null;
 }
 
-// Build the transition options for a given kiosk action.
-async function kioskOpts(action: "CHECKOUT" | "RETURN" | "CLEAN", actor: Actor): Promise<TransitionOpts> {
-  if (action === "CHECKOUT") {
-    const hours = await getCheckoutWindowHours();
-    const now = new Date();
-    const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
-    return {
-      action: "CHECKOUT",
-      from: [STATUS.AVAILABLE],
-      to: STATUS.CHECKED_OUT,
-      role: ROLE.OPERATOR,
-      data: { checkedOutById: actor.workerId, checkedOutAt: now, dueAt: due },
-    };
-  }
-  if (action === "RETURN") {
-    return {
-      action: "RETURN",
-      from: [STATUS.CHECKED_OUT],
-      to: STATUS.DIRTY,
-      role: ROLE.OPERATOR,
-      data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
-      guard: (knife, ctx) =>
-        knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
-          ? null
-          : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
-    };
-  }
-  // Cleaning returns the knife straight to service (no separate QA step).
-  // CLEANED is accepted as a source for any legacy knives stuck in that state.
-  return {
-    action: "CLEAN",
-    from: [STATUS.DIRTY, STATUS.CLEANED],
-    to: STATUS.AVAILABLE,
-    role: ROLE.SANITATION,
-  };
+type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
+
+// Which role each kiosk action needs.
+const ACTION_ROLE: Record<KioskAction, Role> = {
+  CHECKOUT: ROLE.OPERATOR,
+  RETURN: ROLE.OPERATOR,
+  CLEAN: ROLE.SANITATION,
+};
+
+async function kioskIsLocked(): Promise<boolean> {
+  const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
+  return locked?.value === "true";
 }
 
 // Step 1 of the kiosk flow: verify the PIN and return who this is, so the
 // worker can confirm their name before the action executes. Nothing changes yet.
 export async function kioskIdentify(
   knifeId: number,
-  action: "CHECKOUT" | "RETURN" | "CLEAN",
+  action: KioskAction,
   pin: string
 ): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
-  const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
-  if (locked?.value === "true") {
+  if (await kioskIsLocked()) {
     return { ok: false, error: "The kiosk is locked. Ask a supervisor to unlock it." };
   }
   const clean = (pin || "").trim();
@@ -223,9 +199,9 @@ export async function kioskIdentify(
 
   // Check the role fits the action now, so a wrong-role PIN fails at this
   // step rather than after the worker confirms their name.
-  const opts = await kioskOpts(action, { workerId: worker.id, roles: worker.roles });
-  if (!hasRole(worker.roles, opts.role)) {
-    return { ok: false, error: `This action requires the ${opts.role} role.` };
+  const role = ACTION_ROLE[action];
+  if (!hasRole(worker.roles, role)) {
+    return { ok: false, error: `This action requires the ${role} role.` };
   }
   return { ok: true, name: worker.name };
 }
@@ -263,24 +239,141 @@ export async function setKioskLockedWithPin(
   return ok();
 }
 
-// Kiosk action: identify by PIN, then run the transition. Operators can
-// check out / check in; sanitation can clean. QA/admin use the main board.
+// Kiosk operator actions: check out / check in. (Sanitation cleaning goes
+// through kioskClean below because it carries the inspection checklist.)
 export async function kioskAct(
   knifeId: number,
-  action: "CHECKOUT" | "RETURN" | "CLEAN",
+  action: "CHECKOUT" | "RETURN",
   pin: string,
   note?: string
 ): Promise<ActionResult> {
-  // Respect the supervisor lock even if a client bypasses the disabled UI.
-  const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
-  if (locked?.value === "true") return fail("The kiosk is locked. Ask a supervisor to unlock it.");
-
+  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
   const actor = await actorFromPin(pin);
   if (!actor) return fail("PIN not recognized.");
-  const opts = await kioskOpts(action, actor);
-  const trimmed = (note || "").trim();
-  if (trimmed) opts.note = trimmed;
-  return applyTransition(knifeId, opts, actor);
+  const trimmed = (note || "").trim() || undefined;
+
+  if (action === "CHECKOUT") {
+    const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
+    if (!knife) return fail("Knife not found.");
+    const now = new Date();
+    const due = computeDueDate(knife.type, now);
+    return applyTransition(
+      knifeId,
+      {
+        action: "CHECKOUT",
+        from: [STATUS.AVAILABLE],
+        to: STATUS.CHECKED_OUT,
+        role: ROLE.OPERATOR,
+        data: { checkedOutById: actor.workerId, checkedOutAt: now, dueAt: due },
+        note: trimmed,
+      },
+      actor
+    );
+  }
+  // RETURN
+  return applyTransition(
+    knifeId,
+    {
+      action: "RETURN",
+      from: [STATUS.CHECKED_OUT],
+      to: STATUS.DIRTY,
+      role: ROLE.OPERATOR,
+      data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
+      note: trimmed,
+      guard: (knife, ctx) =>
+        knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
+          ? null
+          : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
+    },
+    actor
+  );
+}
+
+export type CleanAnswers = {
+  cleaned: boolean;
+  inspected: boolean;
+  condition: "GOOD" | "DAMAGED";
+  damageReason?: string;
+};
+
+// Sanitation cleaning with the 4-question inspection checklist. A "Good"
+// knife returns to service; a "Damaged" one is held for a manager.
+export async function kioskClean(
+  knifeId: number,
+  pin: string,
+  answers: CleanAnswers
+): Promise<ActionResult> {
+  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
+  const actor = await actorFromPin(pin);
+  if (!actor) return fail("PIN not recognized.");
+  if (!hasRole(actor.roles, ROLE.SANITATION)) {
+    return fail("This action requires the SANITATION role.");
+  }
+
+  const reason = (answers.damageReason || "").trim();
+
+  if (answers.condition === "DAMAGED") {
+    if (!reason) return fail("Describe the damage before submitting.");
+    const res = await applyTransition(
+      knifeId,
+      {
+        action: "DAMAGE",
+        from: [STATUS.DIRTY, STATUS.CLEANED],
+        to: STATUS.DAMAGED,
+        role: ROLE.SANITATION,
+        data: { damageNote: reason, checkedOutById: null, checkedOutAt: null, dueAt: null },
+        note: `Cleaned: ${answers.cleaned ? "Y" : "N"}, Inspected: ${answers.inspected ? "Y" : "N"}, Condition: Damaged — ${reason}`,
+      },
+      actor
+    );
+    // Live Teams notification so a manager knows a knife needs review.
+    if (res.ok) {
+      const cfg = await getTeamsConfig();
+      if (cfg.enabled && cfg.notifyDamaged && cfg.webhookUrl) {
+        const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { number: true } });
+        const worker = await prisma.worker.findUnique({ where: { id: actor.workerId }, select: { name: true } });
+        await postToTeams(
+          cfg.webhookUrl,
+          `⚠️ Knife #${knife?.number} flagged **damaged** by ${worker?.name}: ${reason} — needs a manager to review.`
+        );
+      }
+    }
+    return res;
+  }
+
+  // Good: must be cleaned AND inspected to return to service.
+  if (!answers.cleaned || !answers.inspected) {
+    return fail("Knife must be marked cleaned and inspected before returning to service.");
+  }
+  return applyTransition(
+    knifeId,
+    {
+      action: "CLEAN",
+      from: [STATUS.DIRTY, STATUS.CLEANED],
+      to: STATUS.AVAILABLE,
+      role: ROLE.SANITATION,
+      data: { damageNote: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
+      note: "Cleaned: Y, Inspected: Y, Condition: Good",
+    },
+    actor
+  );
+}
+
+// Manager (admin) returns a damaged knife to service after review.
+export async function returnDamagedToService(knifeId: number): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.ADMIN);
+  if (!auth.ok) return fail(auth.error);
+  return applyTransition(
+    knifeId,
+    {
+      action: "MANAGER_RETURN",
+      from: [STATUS.DAMAGED],
+      to: STATUS.AVAILABLE,
+      role: ROLE.ADMIN,
+      data: { damageNote: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
+    },
+    { workerId: auth.workerId, roles: auth.roles }
+  );
 }
 
 // ---- Lifecycle actions ----------------------------------------------------
@@ -288,9 +381,10 @@ export async function kioskAct(
 export async function checkoutKnife(knifeId: number): Promise<ActionResult> {
   const auth = await requireWorkerWithRole(ROLE.OPERATOR);
   if (!auth.ok) return fail(auth.error);
-  const hours = await getCheckoutWindowHours();
+  const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
+  if (!knife) return fail("Knife not found.");
   const now = new Date();
-  const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
+  const due = computeDueDate(knife.type, now);
   return transition(knifeId, {
     action: "CHECKOUT",
     from: [STATUS.AVAILABLE],
@@ -360,12 +454,13 @@ export async function retireKnife(knifeId: number, reason: string): Promise<Acti
     knifeId,
     {
       action: "RETIRE",
-      from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DIRTY, STATUS.CLEANED],
+      from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DIRTY, STATUS.CLEANED, STATUS.DAMAGED],
       to: STATUS.OUT_OF_SERVICE,
       role: ROLE.ADMIN,
       note: (reason || "").trim() || undefined,
       data: {
         retiredAt: new Date(),
+        damageNote: null,
         checkedOutById: null,
         checkedOutAt: null,
         dueAt: null,
@@ -578,36 +673,57 @@ export async function deleteWorker(workerId: number): Promise<ActionResult> {
   return ok();
 }
 
-// Email alert *preferences* only — delivery is not wired up yet, so this
-// simply persists what an admin wants; nothing is sent.
-export async function updateEmailSettings(input: {
+// ---- Microsoft Teams notifications ----------------------------------------
+
+// POST a simple message to a Teams Incoming Webhook. Returns an error string
+// on failure, or null on success. Never throws.
+async function postToTeams(webhookUrl: string, text: string): Promise<string | null> {
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return `Teams returned HTTP ${res.status}.`;
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : "Could not reach Teams.";
+  }
+}
+
+async function getTeamsConfig() {
+  const rows = await prisma.setting.findMany({
+    where: { key: { in: ["teams.enabled", "teams.webhookUrl", "teams.notifyDamaged", "teams.notifyOverdue"] } },
+  });
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  return {
+    enabled: map.get("teams.enabled") === "true",
+    webhookUrl: map.get("teams.webhookUrl") ?? "",
+    notifyDamaged: (map.get("teams.notifyDamaged") ?? "true") === "true",
+    notifyOverdue: (map.get("teams.notifyOverdue") ?? "true") === "true",
+  };
+}
+
+export async function updateTeamsSettings(input: {
   enabled: boolean;
-  recipients: string;
+  webhookUrl: string;
+  notifyDamaged: boolean;
   notifyOverdue: boolean;
-  notifyDailySweep: boolean;
 }): Promise<ActionResult> {
   const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
-
-  const recipients = input.recipients
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const bad = recipients.find((r) => !emailRe.test(r));
-  if (bad) return fail(`"${bad}" is not a valid email address.`);
-  if (input.enabled && recipients.length === 0) {
-    return fail("Add at least one recipient before enabling email alerts.");
+  const url = (input.webhookUrl || "").trim();
+  if (input.enabled) {
+    if (!/^https:\/\/\S+$/.test(url)) return fail("Enter a valid https Teams webhook URL.");
+    if (!input.notifyDamaged && !input.notifyOverdue) {
+      return fail("Choose at least one thing to be notified about.");
+    }
   }
-  if (input.enabled && !input.notifyOverdue && !input.notifyDailySweep) {
-    return fail("Choose at least one thing to be notified about.");
-  }
-
   const entries: [string, string][] = [
-    ["email.enabled", String(input.enabled)],
-    ["email.recipients", recipients.join(",")],
-    ["email.notifyOverdue", String(input.notifyOverdue)],
-    ["email.notifyDailySweep", String(input.notifyDailySweep)],
+    ["teams.enabled", String(input.enabled)],
+    ["teams.webhookUrl", url],
+    ["teams.notifyDamaged", String(input.notifyDamaged)],
+    ["teams.notifyOverdue", String(input.notifyOverdue)],
   ];
   for (const [key, value] of entries) {
     await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
@@ -616,17 +732,62 @@ export async function updateEmailSettings(input: {
   return ok();
 }
 
-export async function updateCheckoutWindow(hours: number): Promise<ActionResult> {
+// Send a test message so an admin can confirm the webhook works.
+export async function sendTeamsTest(): Promise<ActionResult> {
   const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
-  if (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 30) {
-    return fail("Enter a valid number of hours.");
+  const cfg = await getTeamsConfig();
+  if (!cfg.webhookUrl) return fail("Add a webhook URL first.");
+  const err = await postToTeams(cfg.webhookUrl, "✅ Safety Knife Checkout — Teams notifications are connected.");
+  return err ? fail(err) : ok();
+}
+
+// ---- Bulk worker upload (CSV) ---------------------------------------------
+
+export type BulkResult = { ok: boolean; added: number; skipped: number; errors: string[] };
+
+// Parse a CSV of "name,pin,roles" (roles separated by ; | or space) and create
+// the workers. Header row optional. Existing/duplicate PINs are skipped.
+export async function bulkAddWorkers(csv: string): Promise<BulkResult> {
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return { ok: false, added: 0, skipped: 0, errors: [auth.error] };
+
+  const lines = (csv || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { ok: false, added: 0, skipped: 0, errors: ["The file is empty."] };
+  // Drop a header row if present.
+  if (/^\s*name\s*,/i.test(lines[0])) lines.shift();
+
+  const existing = await prisma.worker.findMany();
+  const usedPins = new Set<string>(); // within this upload
+  let added = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const [i, line] of lines.entries()) {
+    const cols = line.split(",").map((c) => c.trim());
+    const name = cols[0] ?? "";
+    const pin = cols[1] ?? "";
+    const rolesRaw = cols.slice(2).join(",");
+    const rowNo = i + 1;
+
+    if (!name) { errors.push(`Row ${rowNo}: missing name.`); skipped++; continue; }
+    if (!/^\d{4,8}$/.test(pin)) { errors.push(`Row ${rowNo} (${name}): PIN must be 4–8 digits.`); skipped++; continue; }
+    const roles = rolesRaw.split(/[;| ]+/).map((r) => r.trim().toUpperCase()).filter((r) => r in ROLE);
+    if (roles.length === 0) { errors.push(`Row ${rowNo} (${name}): no valid roles (OPERATOR/SANITATION/QA/ADMIN).`); skipped++; continue; }
+    if (usedPins.has(pin) || existing.some((w) => verifyPin(pin, w.pin))) {
+      errors.push(`Row ${rowNo} (${name}): PIN already in use.`); skipped++; continue;
+    }
+
+    try {
+      await prisma.worker.create({ data: { name, pin: hashPin(pin), roles: roles.join(","), active: true } });
+      usedPins.add(pin);
+      added++;
+    } catch {
+      errors.push(`Row ${rowNo} (${name}): could not be added.`);
+      skipped++;
+    }
   }
-  await prisma.setting.upsert({
-    where: { key: "checkoutWindowHours" },
-    update: { value: String(hours) },
-    create: { key: "checkoutWindowHours", value: String(hours) },
-  });
+
   revalidatePath("/", "layout");
-  return ok();
+  return { ok: added > 0, added, skipped, errors };
 }

@@ -16,6 +16,7 @@ import {
   cleanKnife,
   retireKnife,
   restoreKnife,
+  returnDamagedToService,
   setKnifeType,
   batchClean,
   type ActionResult,
@@ -30,6 +31,7 @@ export type KnifeDTO = {
   dueAtMs: number | null;
   checkedOutAtMs: number | null;
   holderName: string | null;
+  damageNote: string | null;
 };
 
 function computeDisplayState(k: KnifeDTO, now: number): DisplayState {
@@ -384,6 +386,12 @@ function KnifeModal({
           )}
         </dl>
 
+        {is === "DAMAGED" && knife.damageNote && (
+          <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            <span className="font-semibold">Reported damage:</span> {knife.damageNote}
+          </div>
+        )}
+
         {error && (
           <p className="text-sm text-red-600 mb-3" role="alert">
             {error}
@@ -426,6 +434,21 @@ function KnifeModal({
               >
                 Clean &amp; return to service
               </ActionButton>
+            )}
+
+            {is === "DAMAGED" && has("ADMIN") && (
+              <ActionButton
+                pending={pending}
+                onClick={() => run(() => returnDamagedToService(knife.id))}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Return to service (manager)
+              </ActionButton>
+            )}
+            {is === "DAMAGED" && !has("ADMIN") && (
+              <p className="text-xs text-slate-500">
+                Only a manager (admin) can return a damaged knife to service.
+              </p>
             )}
 
             {(has("ADMIN") || has("QA")) && is !== "OUT_OF_SERVICE" && (

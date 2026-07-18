@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     dueAtMs: k.dueAt ? k.dueAt.getTime() : null,
     checkedOutAtMs: k.checkedOutAt ? k.checkedOutAt.getTime() : null,
     holderName: k.checkedOutBy?.name ?? null,
+    damageNote: k.damageNote ?? null,
   }));
 
   return (

@@ -25,7 +25,16 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body>
+      <head>
+        {/* Apply the saved theme before paint to avoid a flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.theme==='dark')document.documentElement.classList.add('dark')}catch(e){}",
+          }}
+        />
+      </head>
+      <body className="dark:bg-slate-900 dark:text-slate-100">
         <div className="min-h-screen flex flex-col">
           <header className="bg-slate-900 text-white">
             <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
