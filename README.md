@@ -71,37 +71,28 @@ right person.
 - **PostgreSQL + Prisma** — managed database with versioned migrations
 - **Tailwind CSS** — touch-friendly, tablet-first UI
 
-## Run it on Docker Desktop (whole app)
+> **Deployment targets:** `main` is set up for **Railway** and **Render** (see below), which
+> build the app with their native Node builders. The full **Docker Desktop** setup
+> (Dockerfile + Compose) lives on the **`claude/docker-desktop`** branch, so it doesn't
+> interfere with those hosts.
 
-With Docker Desktop running, one command builds the app image and starts it alongside
-PostgreSQL:
+## Getting started (local dev)
 
-```bash
-docker compose up --build
-```
-
-Then open **http://localhost:3000**. On first boot the app applies the database migrations
-and seeds the fleet automatically, so it's ready to use. Sign in with the default PINs below.
-
-- Data persists in the `knife_pgdata` volume across restarts.
-- Stop with `Ctrl+C` (or `docker compose down`); wipe the database with `docker compose down -v`.
-- Rebuild after code changes with `docker compose up --build`.
-
-## Getting started (local dev without Docker for the app)
-
-You need a PostgreSQL database. The quickest way is to run **just the database** from the
-compose file and develop the app with `npm run dev`:
+You need a PostgreSQL database. Start a throwaway one with Docker (or use any Postgres and
+put its URL in `.env`), then run the app:
 
 ```bash
-docker compose up db -d    # starts Postgres on localhost:5432 (matches .env)
+docker run -d --name knife-db \
+  -e POSTGRES_USER=knife -e POSTGRES_PASSWORD=knife -e POSTGRES_DB=knifedb \
+  -p 5432:5432 postgres:16       # or use your own Postgres + set DATABASE_URL in .env
 npm install
-npm run db:migrate         # apply migrations (creates the tables)
-npm run db:seed            # seed 42 knives (1–14, 51–64, 65–78) + starter workers
-npm run dev                # http://localhost:3000
+npm run db:migrate               # apply migrations (creates the tables)
+npm run db:seed                  # seed 42 knives (1–14, 51–64, 65–78) + starter workers
+npm run dev                      # http://localhost:3000
 ```
 
-Already have a Postgres you'd rather use? Put its connection string in `DATABASE_URL`
-(in `.env`) and skip the `docker compose` step.
+To run the whole app in containers instead, use the **`claude/docker-desktop`** branch
+(`docker compose up --build`).
 
 ### Default PINs (change these in Admin)
 
@@ -118,6 +109,20 @@ Already have a Postgres you'd rather use? Put its connection string in `DATABASE
 - `npm run db:reset` — drop, re-migrate, and re-seed the database
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
+
+## Deploy on Render (Blueprint)
+
+The repo includes a `render.yaml` Blueprint that provisions the web service **and** a
+PostgreSQL database together.
+
+1. In [Render](https://render.com): **New → Blueprint**, connect this repo, pick `main`, and
+   **Apply**. Render reads `render.yaml` and creates the `safety-knife-checkout` web service
+   plus the `knife-db` Postgres, wiring `DATABASE_URL` automatically.
+2. On first deploy the app applies migrations and seeds the fleet, then serves. Open the URL
+   Render gives you and sign in with the default PINs below.
+
+The Blueprint uses Render's entry paid plans (`starter` web + `basic-256mb` Postgres) so the
+service stays awake and the database is persistent; adjust the `plan:` values to size up/down.
 
 ## Deploy on Railway
 
