@@ -42,8 +42,7 @@ export function AdminPanel({
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         <KnifeAndLogoCard logoDataUrl={logoDataUrl} />
-        <AddWorkerCard />
-        <WorkersCard workers={workers} />
+        <WorkersAndAddCard workers={workers} />
         <KnivesCard knives={knives} />
       </div>
       <TeamsCard settings={teamsSettings} />
@@ -340,7 +339,18 @@ const SAMPLE_CSV =
   "Quinn QA,4504,QA\n" +
   "Alex Manager,4505,ADMIN\n";
 
-function AddWorkerCard() {
+// One admin card holding "Add a worker" and the "Employees" list.
+function WorkersAndAddCard({ workers }: { workers: WorkerRow[] }) {
+  return (
+    <Card title="Workers">
+      <AddWorkerSection />
+      <div className="my-4 border-t border-slate-100 dark:border-slate-700" />
+      <EmployeesSection workers={workers} />
+    </Card>
+  );
+}
+
+function AddWorkerSection() {
   const { pending, msg, run } = useRun();
   const router = useRouter();
   const [name, setName] = useState("");
@@ -384,7 +394,8 @@ function AddWorkerCard() {
   }
 
   return (
-    <Card title="Add a worker">
+    <div>
+      <h3 className="font-semibold mb-2">Add a worker</h3>
       <div className="space-y-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={INPUT} />
         <input
@@ -446,7 +457,7 @@ function AddWorkerCard() {
         </div>
         <Msg msg={bulkMsg} />
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -516,19 +527,20 @@ function TeamsCard({ settings }: { settings: TeamsSettings }) {
   );
 }
 
-function WorkersCard({ workers }: { workers: WorkerRow[] }) {
+function EmployeesSection({ workers }: { workers: WorkerRow[] }) {
   return (
-    <Card title="Employees">
+    <div>
+      <h3 className="font-semibold mb-1">Employees ({workers.length})</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Edit an employee&apos;s name, roles, or PIN; deactivate to revoke access while keeping
         their history; remove to delete entirely.
       </p>
-      <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+      <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
         {workers.map((w) => (
           <EmployeeRow key={w.id} worker={w} />
         ))}
       </ul>
-    </Card>
+    </div>
   );
 }
 

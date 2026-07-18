@@ -149,11 +149,11 @@ export default function KioskBoard({
       <div className="flex flex-wrap gap-4 mb-3 text-sm">
         <span className="flex items-center gap-2">
           <span className="inline-block w-4 h-4 rounded bg-blue-600 border border-blue-700" />
-          FC — Food Contact / Contacto con alimentos
+          Food Contact / Contacto con alimentos
         </span>
         <span className="flex items-center gap-2">
           <span className="inline-block w-4 h-4 rounded bg-slate-300 border border-slate-400" />
-          NFC — Non-Food Contact / Sin contacto con alimentos
+          Non-Food Contact / Sin contacto con alimentos
         </span>
       </div>
 
@@ -169,8 +169,8 @@ export default function KioskBoard({
             title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
           >
             <span className="text-base sm:text-lg md:text-xl leading-none">#{k.number}</span>
-            <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-wide leading-none">
-              {TYPE_META[normalizeType(k.type)].short}
+            <span className="w-full px-0.5 text-center text-[9px] sm:text-[11px] md:text-xs font-bold uppercase tracking-tight leading-tight">
+              {TYPE_META[normalizeType(k.type)].label}
             </span>
             {/* who has it checked out */}
             {k.status === "CHECKED_OUT" && k.holderName && (
