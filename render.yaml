@@ -25,7 +25,7 @@ services:
       # Change this to the plant's local zone (IANA name) — default UTC is
       # almost never what you want for shift cut-offs.
       - key: TZ
-        value: "America/Chicago"
+        value: "America/New_York"
 
 databases:
   - name: knife-db
