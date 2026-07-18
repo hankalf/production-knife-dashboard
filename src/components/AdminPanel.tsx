@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addKnife,
@@ -8,76 +8,39 @@ import {
   setWorkerActive,
   updateWorker,
   deleteWorker,
-  updateCheckoutWindow,
-  updateEmailSettings,
+  updateTeamsSettings,
+  sendTeamsTest,
+  bulkAddWorkers,
   setKioskLocked,
   type ActionResult,
 } from "@/app/actions";
-import type { EmailSettings } from "@/lib/data";
+import type { TeamsSettings } from "@/lib/data";
 
 const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "ADMIN"];
+const INPUT =
+  "w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2";
 
 type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 
 export function AdminPanel({
-  checkoutWindowHours,
   kioskLocked,
-  emailSettings,
+  teamsSettings,
   workers,
 }: {
-  checkoutWindowHours: number;
   kioskLocked: boolean;
-  emailSettings: EmailSettings;
+  teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         <AddKnifeCard />
-        <CheckoutWindowCard hours={checkoutWindowHours} />
+        <KioskLockCard locked={kioskLocked} />
         <AddWorkerCard />
         <WorkersCard workers={workers} />
-        <KioskLockCard locked={kioskLocked} />
       </div>
-      <EmailAlertsCard settings={emailSettings} />
+      <TeamsCard settings={teamsSettings} />
     </div>
-  );
-}
-
-function KioskLockCard({ locked }: { locked: boolean }) {
-  const { pending, msg, run } = useRun();
-  return (
-    <Card title="Kiosk mode">
-      <p className="text-sm text-slate-500 mb-3">
-        The wall-display kiosk lets floor staff check out, check in, and clean with their PIN.
-        Lock it to make the kiosk view-only (supervisors can also lock/unlock from the kiosk
-        itself with an admin PIN).
-      </p>
-      <div className="flex items-center gap-3">
-        <span
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
-            locked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-          }`}
-        >
-          {locked ? "🔒 Locked (view-only)" : "🔓 Interactive"}
-        </span>
-        <button
-          onClick={() =>
-            run(
-              () => setKioskLocked(!locked),
-              `Kiosk ${locked ? "unlocked" : "locked"}.`
-            )
-          }
-          disabled={pending}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            locked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
-          }`}
-        >
-          {locked ? "Unlock kiosk" : "Lock kiosk"}
-        </button>
-      </div>
-      <Msg msg={msg} />
-    </Card>
   );
 }
 
@@ -103,7 +66,7 @@ function useRun() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
       <h2 className="text-lg font-semibold mb-3">{title}</h2>
       {children}
     </div>
@@ -113,9 +76,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function Msg({ msg }: { msg: { ok: boolean; text: string } | null }) {
   if (!msg) return null;
   return (
-    <p className={`text-sm mt-2 ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>
-      {msg.text}
-    </p>
+    <p className={`text-sm mt-2 ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>
   );
 }
 
@@ -125,7 +86,7 @@ function AddKnifeCard() {
   const [type, setType] = useState<"FC" | "NFC">("FC");
   return (
     <Card title="Add a knife">
-      <p className="text-sm text-slate-500 mb-3">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         New knives enter the fleet as Available.
       </p>
       <div className="flex gap-2 mb-2">
@@ -134,7 +95,7 @@ function AddKnifeCard() {
           onChange={(e) => setNumber(e.target.value)}
           inputMode="numeric"
           placeholder="Knife number (e.g. 79)"
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+          className={`flex-1 ${INPUT}`}
         />
         <button
           onClick={() => run(() => addKnife(number, type), `Knife #${number} added.`)}
@@ -155,7 +116,7 @@ function AddKnifeCard() {
                 ? t === "FC"
                   ? "bg-blue-600 text-white border-transparent"
                   : "bg-slate-300 text-slate-800 border-transparent"
-                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+                : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
             }`}
           >
             {t === "FC" ? "Food Contact" : "Non-Food Contact"}
@@ -167,28 +128,32 @@ function AddKnifeCard() {
   );
 }
 
-function CheckoutWindowCard({ hours }: { hours: number }) {
+function KioskLockCard({ locked }: { locked: boolean }) {
   const { pending, msg, run } = useRun();
-  const [value, setValue] = useState(String(hours));
   return (
-    <Card title="Checkout time limit">
-      <p className="text-sm text-slate-500 mb-3">
-        A checked-out knife is flagged overdue after this many hours (default 24 = one day).
+    <Card title="Kiosk mode">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        The wall-display kiosk lets floor staff check out, check in, and clean with their PIN.
+        Lock it to make the kiosk view-only.
       </p>
-      <div className="flex gap-2 items-center">
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          inputMode="numeric"
-          className="w-24 rounded-lg border border-slate-300 px-3 py-2"
-        />
-        <span className="text-slate-500">hours</span>
-        <button
-          onClick={() => run(() => updateCheckoutWindow(Number(value)), "Time limit updated.")}
-          disabled={pending}
-          className="rounded-lg bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 disabled:opacity-50"
+      <div className="flex items-center gap-3">
+        <span
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
+            locked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+          }`}
         >
-          Save
+          {locked ? "🔒 Locked (view-only)" : "🔓 Interactive"}
+        </span>
+        <button
+          onClick={() =>
+            run(() => setKioskLocked(!locked), `Kiosk ${locked ? "unlocked" : "locked"}.`)
+          }
+          disabled={pending}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+            locked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
+          }`}
+        >
+          {locked ? "Unlock kiosk" : "Lock kiosk"}
         </button>
       </div>
       <Msg msg={msg} />
@@ -196,31 +161,67 @@ function CheckoutWindowCard({ hours }: { hours: number }) {
   );
 }
 
+const SAMPLE_CSV =
+  "name,pin,roles\n" +
+  "Jane Operator,4501,OPERATOR\n" +
+  "Sam Sanitation,4502,SANITATION\n" +
+  "Pat Supervisor,4503,OPERATOR;SANITATION\n" +
+  "Quinn QA,4504,QA\n" +
+  "Alex Manager,4505,ADMIN\n";
+
 function AddWorkerCard() {
   const { pending, msg, run } = useRun();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [roles, setRoles] = useState<string[]>(["OPERATOR"]);
+  const [bulkPending, startBulk] = useTransition();
+  const [bulkMsg, setBulkMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function toggle(r: string) {
     setRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
   }
 
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkMsg(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      startBulk(async () => {
+        const res = await bulkAddWorkers(text);
+        const parts = [`${res.added} added`, `${res.skipped} skipped`];
+        const text2 = parts.join(", ") + (res.errors.length ? ` — ${res.errors.slice(0, 4).join(" ")}` : "");
+        setBulkMsg({ ok: res.added > 0, text: text2 });
+        router.refresh();
+      });
+    };
+    reader.readAsText(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function downloadSample() {
+    const blob = new Blob([SAMPLE_CSV], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "workers-sample.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Card title="Add a worker">
       <div className="space-y-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Name"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-        />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={INPUT} />
         <input
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           inputMode="numeric"
           placeholder="PIN (4–8 digits)"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          className={INPUT}
         />
         <div className="flex flex-wrap gap-2">
           {ALL_ROLES.map((r) => (
@@ -231,7 +232,7 @@ function AddWorkerCard() {
               className={`rounded-full border px-3 py-1.5 text-sm ${
                 roles.includes(r)
                   ? "border-slate-800 bg-slate-800 text-white"
-                  : "border-slate-300 bg-white"
+                  : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
               }`}
             >
               {r}
@@ -239,9 +240,7 @@ function AddWorkerCard() {
           ))}
         </div>
         <button
-          onClick={() =>
-            run(() => addWorker(name, pin, roles), `${name || "Worker"} added.`)
-          }
+          onClick={() => run(() => addWorker(name, pin, roles), `${name || "Worker"} added.`)}
           disabled={pending}
           className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white py-2 disabled:opacity-50"
         >
@@ -249,81 +248,98 @@ function AddWorkerCard() {
         </button>
       </div>
       <Msg msg={msg} />
+
+      {/* Bulk upload */}
+      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+        <div className="text-sm font-medium mb-1">Bulk upload (CSV)</div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+          Columns: <code>name,pin,roles</code> (roles separated by <code>;</code> — e.g.
+          <code> OPERATOR;SANITATION</code>). Duplicate PINs are skipped.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onFile}
+            disabled={bulkPending}
+            className="text-sm"
+          />
+          <button
+            type="button"
+            onClick={downloadSample}
+            className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
+          >
+            Download sample CSV
+          </button>
+        </div>
+        <Msg msg={bulkMsg} />
+      </div>
     </Card>
   );
 }
 
-function EmailAlertsCard({ settings }: { settings: EmailSettings }) {
+function TeamsCard({ settings }: { settings: TeamsSettings }) {
   const { pending, msg, run } = useRun();
   const [enabled, setEnabled] = useState(settings.enabled);
-  const [recipients, setRecipients] = useState(settings.recipients);
+  const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
+  const [notifyDamaged, setNotifyDamaged] = useState(settings.notifyDamaged);
   const [notifyOverdue, setNotifyOverdue] = useState(settings.notifyOverdue);
-  const [notifyDailySweep, setNotifyDailySweep] = useState(settings.notifyDailySweep);
 
   return (
-    <Card title="Email alerts">
-      <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        <span className="font-medium">Not connected yet.</span> These preferences are
-        saved, but no emails are sent until email delivery is wired up. This screen sets up
-        who would be notified and about what.
-      </div>
+    <Card title="Microsoft Teams notifications">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        Paste an <strong>Incoming Webhook</strong> URL from your Teams channel. When a knife is
+        flagged <strong>damaged</strong>, a message is posted to that channel so a manager can
+        review it. (Overdue/scheduled alerts need a scheduled job — the damaged alert works now.)
+      </p>
 
-      <label className="flex items-center gap-3 mb-4">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          className="w-5 h-5"
-        />
-        <span className="font-medium">Enable email alerts (once delivery is connected)</span>
+      <label className="flex items-center gap-3 mb-3">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="w-5 h-5" />
+        <span className="font-medium">Enable Teams notifications</span>
       </label>
 
-      <label className="block text-sm text-slate-600 mb-1">
-        Recipients (comma or newline separated)
-      </label>
-      <textarea
-        value={recipients}
-        onChange={(e) => setRecipients(e.target.value)}
-        placeholder="qa-lead@plant.com, floor-supervisor@plant.com"
-        rows={2}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4"
+      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">Webhook URL</label>
+      <input
+        value={webhookUrl}
+        onChange={(e) => setWebhookUrl(e.target.value)}
+        placeholder="https://<tenant>.webhook.office.com/webhookb2/…"
+        className={`${INPUT} mb-3`}
       />
 
       <fieldset className="mb-4">
-        <legend className="text-sm text-slate-600 mb-2">Notify when…</legend>
+        <legend className="text-sm text-slate-600 dark:text-slate-300 mb-2">Notify when…</legend>
         <label className="flex items-center gap-3 mb-2">
-          <input
-            type="checkbox"
-            checked={notifyOverdue}
-            onChange={(e) => setNotifyOverdue(e.target.checked)}
-            className="w-5 h-5"
-          />
-          <span>A knife goes overdue (out past its time limit)</span>
+          <input type="checkbox" checked={notifyDamaged} onChange={(e) => setNotifyDamaged(e.target.checked)} className="w-5 h-5" />
+          <span>A knife is flagged damaged (needs a manager) — live</span>
         </label>
         <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={notifyDailySweep}
-            onChange={(e) => setNotifyDailySweep(e.target.checked)}
-            className="w-5 h-5"
-          />
-          <span>End-of-day sweep — knives still checked out at shift close</span>
+          <input type="checkbox" checked={notifyOverdue} onChange={(e) => setNotifyOverdue(e.target.checked)} className="w-5 h-5" />
+          <span>A knife goes overdue (requires a scheduled job)</span>
         </label>
       </fieldset>
 
-      <button
-        onClick={() =>
-          run(
-            () =>
-              updateEmailSettings({ enabled, recipients, notifyOverdue, notifyDailySweep }),
-            "Email preferences saved."
-          )
-        }
-        disabled={pending}
-        className="rounded-lg bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 disabled:opacity-50"
-      >
-        Save preferences
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() =>
+            run(
+              () => updateTeamsSettings({ enabled, webhookUrl, notifyDamaged, notifyOverdue }),
+              "Teams settings saved."
+            )
+          }
+          disabled={pending}
+          className="rounded-lg bg-slate-800 dark:bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 disabled:opacity-50"
+        >
+          Save
+        </button>
+        <button
+          onClick={() => run(() => sendTeamsTest(), "Test message sent to Teams.")}
+          disabled={pending}
+          className="rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 disabled:opacity-50"
+        >
+          Send test message
+        </button>
+      </div>
       <Msg msg={msg} />
     </Card>
   );
@@ -332,11 +348,11 @@ function EmailAlertsCard({ settings }: { settings: EmailSettings }) {
 function WorkersCard({ workers }: { workers: WorkerRow[] }) {
   return (
     <Card title="Employees">
-      <p className="text-sm text-slate-500 mb-3">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         Edit an employee&apos;s name, roles, or PIN; deactivate to revoke access while keeping
         their history; remove to delete entirely.
       </p>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-slate-100 dark:divide-slate-700">
         {workers.map((w) => (
           <EmployeeRow key={w.id} worker={w} />
         ))}
@@ -358,7 +374,6 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
   function toggle(r: string) {
     setRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
   }
-
   function reset() {
     setName(worker.name);
     setRoles(worker.roles.split(",").map((r) => r.trim()).filter(Boolean));
@@ -369,12 +384,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
   if (editing) {
     return (
       <li className="py-3 space-y-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-          placeholder="Name"
-        />
+        <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT} placeholder="Name" />
         <div className="flex flex-wrap gap-2">
           {ALL_ROLES.map((r) => (
             <button
@@ -384,7 +394,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
               className={`rounded-full border px-3 py-1.5 text-sm ${
                 roles.includes(r)
                   ? "border-slate-800 bg-slate-800 text-white"
-                  : "border-slate-300 bg-white"
+                  : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
               }`}
             >
               {r}
@@ -396,7 +406,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
           onChange={(e) => setPin(e.target.value)}
           inputMode="numeric"
           placeholder="New PIN (leave blank to keep current)"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          className={INPUT}
         />
         <div className="flex gap-2">
           <button
@@ -412,10 +422,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
           >
             Save
           </button>
-          <button
-            onClick={reset}
-            className="rounded-lg bg-slate-100 hover:bg-slate-200 px-4 py-2 text-sm"
-          >
+          <button onClick={reset} className="rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 px-4 py-2 text-sm">
             Cancel
           </button>
         </div>
@@ -431,12 +438,12 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
           <div className={`font-medium ${worker.active ? "" : "text-slate-400 line-through"}`}>
             {worker.name}
           </div>
-          <div className="text-xs text-slate-500">{worker.roles}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">{worker.roles}</div>
         </div>
         <div className="flex flex-wrap gap-1 justify-end">
           <button
             onClick={() => setEditing(true)}
-            className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
+            className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
           >
             Edit
           </button>
@@ -450,7 +457,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
             disabled={pending}
             className={`text-sm rounded-lg px-3 py-1.5 disabled:opacity-50 ${
               worker.active
-                ? "bg-slate-100 hover:bg-slate-200"
+                ? "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
                 : "bg-emerald-600 text-white hover:bg-emerald-700"
             }`}
           >
@@ -460,9 +467,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
             <>
               <button
                 onClick={() =>
-                  run(() => deleteWorker(worker.id), `${worker.name} removed.`, () =>
-                    setConfirmRemove(false)
-                  )
+                  run(() => deleteWorker(worker.id), `${worker.name} removed.`, () => setConfirmRemove(false))
                 }
                 disabled={pending}
                 className="text-sm rounded-lg px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
@@ -471,7 +476,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
               </button>
               <button
                 onClick={() => setConfirmRemove(false)}
-                className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
+                className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
               >
                 No
               </button>
@@ -479,7 +484,7 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
           ) : (
             <button
               onClick={() => setConfirmRemove(true)}
-              className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-red-100 hover:text-red-700"
+              className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 hover:text-red-700"
             >
               Remove
             </button>

@@ -1,38 +1,63 @@
 # Safety Knife Checkout System
 
 A tablet-first web app for tracking pre-numbered food-production safety knives through
-their full lifecycle: **operator checkout → sanitation cleaning → back in service**. A knife
-kept out past its time limit (default one day) is flagged overdue. Every action is recorded
-for food-safety auditing.
+their full lifecycle: **operator checkout → sanitation cleaning & inspection → back in
+service**. A knife kept out past its due date is flagged overdue. Every action is recorded
+for food-safety auditing. Day-to-day the app runs in **kiosk mode on a shared iPad**; the
+management board and admin panel are for admins and QA only.
 
 ## Lifecycle
 
 ```
 AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)──▶ DIRTY
    ▲                                                                   │
-   └──────────────── clean & return to service(sanitation) ◀──────────┘
+   │                                    sanitation cleans + inspects   │
+   │                                                                    ▼
+   └───── condition GOOD ◀──────────────── 4-question checklist ──────▶ DAMAGED
+                                                                         │
+                          manager (admin) returns to service ◀──────────┘
 ```
 
-Cleaning returns a knife straight to service — there is no separate QA-inspection step.
+Before a used knife goes back in service, **sanitation answers a 4-question checklist**
+(all prompts bilingual, English + Spanish):
 
-- **Overdue** is derived (a checked-out knife past its due time), shown in red with a banner.
+1. **Cleaned?** Yes / No
+2. **Inspected?** Yes / No
+3. **Condition** — Good or Damaged
+4. If **Damaged**, describe why
+
+A **Good** knife (cleaned **and** inspected) returns straight to service. A **Damaged** knife
+moves to a **DAMAGED** state with the reported reason, and **only a manager (admin)** can
+return it to service from the board.
+
+- **Overdue** is derived (a checked-out knife past its due date), shown in red with a banner.
 - **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
 
-### Knife type
+### Knife type & due dates
 
-Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**, shown as a corner badge on
-every tile — **blue FC**, **silver NFC** — on both the board and the kiosk (the tile fill still
-shows lifecycle status). Set the type when adding a knife, or change it later from the knife's
-action modal (admin/QA). New knives default to FC.
+Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**. The type drives the
+**due date** at checkout:
+
+- **FC** — checked out and returned the **same day**, due by end of shift (end of today).
+- **NFC** — signed out for the week (Mon–Fri), **due end of Friday**.
+
+On the kiosk the whole number bubble is **blue for FC** and **silver for NFC**, with a large
+centered type badge; a small corner dot still shows lifecycle status and an overdue knife
+gets a red ring. On the management board the type shows as a corner badge. Set the type when
+adding a knife, or change it later from the knife's action modal (admin/QA). New knives
+default to FC.
+
+> Due dates use the **server's local time** — set the `TZ` environment variable (e.g.
+> `TZ=America/Chicago`) on your host so "end of day/Friday" matches the plant's timezone.
 
 ## Roles (identified by PIN)
 
 | Role | Can do |
 |------|--------|
-| Operator | Check out an available knife; return **their own** checked-out knife after use |
-| Sanitation | Clean used (dirty) knives, returning them straight to service — one at a time or in a batch |
-| QA | Supervisory role with admin-panel access (there is no separate QA inspection step) |
-| Admin | **Everything** — all operator/sanitation/QA functions, plus add knives, retire/restore, manage workers & PINs, set the time limit, lock the kiosk, and export the audit log |
+| Operator | Check out an available knife; return **their own** checked-out knife after use (kiosk only) |
+| Sanitation | Clean & inspect used (dirty) knives via the checklist, returning good ones to service |
+| QA | Supervisory role with fleet-board and admin-panel access |
+| Admin (manager) | **Everything** — all operator/sanitation functions, return **damaged** knives to service, plus add knives, retire/restore, manage workers & PINs, lock the kiosk, configure Teams alerts, and export the audit log |
 
 A worker can hold multiple roles, and **admins implicitly have every capability**. Only the
 operator who checked a knife out (or an admin) can return it, so returns are attributed to the
@@ -40,30 +65,34 @@ right person.
 
 ## Access & the admin panel
 
-- The whole app **except the kiosk** is gated: visiting the board, reports, or a knife's
-  history shows a **full-screen PIN sign-in** first — nothing is viewable until you enter a
-  valid PIN. The **`/kiosk`** wall display stays open (no sign-in) so a shared screen can
-  always show status.
-- The **admin panel** (`/admin`) is limited to **admins and QA**, and requires its own PIN
-  entry each visit (a short re-auth) even if you're already signed in on the board.
-- Floor actions on the board and kiosk are gated by role — each person only sees the actions
-  they're allowed to take.
+The app is used **99% of the time in kiosk mode** by employees on a shared iPad, so the two
+surfaces are gated very differently:
+
+- **`/kiosk`** — open to everyone, no sign-in. Employees tap a knife and confirm each action
+  with their PIN. This is the everyday floor surface.
+- The **management board (`/`)**, reports, knife history, and the **admin panel (`/admin`)**
+  are restricted to **admins and QA**. Visiting them shows a **full-screen PIN sign-in**; a
+  worker who signs in without the admin/QA role is told the area is kiosk-only and pointed
+  back to the kiosk.
+- Once an admin or QA is signed in on the board, opening the **Admin** tab needs **no second
+  PIN** — the existing session carries through.
 
 ## Screens
 
-- **`/`** — live color-coded fleet board; tap a knife to act on it. Sanitation/QA get a
-  **batch mode** to clear many knives at once.
-- **`/reports`** *(any signed-in worker)* — end-of-day sweep of everything still checked out,
-  plus fleet metrics: average return→clean turnaround, total cleanings, and most-used knives.
-- **`/kiosk`** — full-screen status board for a wall-mounted display (auto-refreshes).
-  Floor staff can check out, check in, and mark cleaned right on the kiosk, confirming
-  each action with their PIN and optionally **adding a note** (e.g. sanitation flagging
-  residue) that lands in the audit trail. A supervisor can **lock the kiosk to view-only**
-  (from the kiosk with an admin/QA PIN, or from Admin → Kiosk mode); locking is enforced
-  server-side.
-- **`/admin`** *(admin)* — add knives, retire/restore, manage workers, set the time limit,
-  export the full audit log to CSV, and configure **email alerts** (see below).
-- **`/knife/<number>`** — a single knife's complete lifecycle history.
+- **`/`** *(admin/QA)* — live color-coded fleet board; tap a knife to act on it. Sanitation/QA
+  get a **batch mode** to clear many knives at once. A manager returns **damaged** knives to
+  service here.
+- **`/reports`** *(admin/QA)* — end-of-day sweep of everything still checked out, plus fleet
+  metrics: average return→clean turnaround, total cleanings, and most-used knives.
+- **`/kiosk`** — full-screen, **bilingual (English + Spanish)** floor surface for the shared
+  iPad (auto-refreshes). Employees check out, check in, and clean+inspect knives right on the
+  kiosk, confirming each action with their PIN and optionally **adding a note** that lands in
+  the audit trail. Cleaning runs the 4-question sanitation checklist. (A supervisor can still
+  lock the kiosk to view-only from **Admin → Kiosk mode**; it's enforced server-side.)
+- **`/admin`** *(admin/QA)* — add knives, retire/restore, manage workers (including
+  **CSV bulk upload**), configure **Teams alerts** (see below), export the full audit log to
+  CSV, and toggle **light/dark mode** from the header.
+- **`/knife/<number>`** *(admin/QA)* — a single knife's complete lifecycle history.
 
 ## Tech stack
 
@@ -151,17 +180,28 @@ Every transition writes an immutable `KnifeEvent` (knife, action, from/to status
 timestamp, note). View a single knife's history at `/knife/<number>`, or export the full
 log to CSV from the Admin screen (`/api/export`).
 
-## Email alerts (setup only — delivery not connected yet)
+## Bulk-add workers (CSV)
 
-The Admin screen has an **Email alerts** panel where you can set the recipient
-addresses and choose what to be notified about (a knife going overdue, and/or the
-end-of-day sweep of knives still checked out). These preferences are saved to the
-`Setting` store (`email.*` keys), but **no emails are sent yet** — the sending layer
-(SMTP/provider + a scheduled job for the daily sweep) is intentionally left unwired.
-Hooking it up later means reading these settings and adding a mailer; the config UI is
-already in place.
+Under **Admin → Add a worker** you can **upload a CSV** to add many workers at once, and
+**download a sample CSV** to fill in. Columns are `name,pin,roles` (one worker per row); the
+`roles` column accepts multiple roles separated by `;`, `|`, or spaces (e.g.
+`SANITATION;QA`). Rows with a duplicate or invalid PIN are skipped and reported, so a partial
+file still imports cleanly.
+
+## Teams notifications
+
+The Admin screen has a **Microsoft Teams notifications** panel. Paste an **Incoming Webhook
+URL** for a Teams channel, enable it, and choose what to be notified about:
+
+- **Damaged knives** — fires **live** the moment sanitation flags a knife damaged (no
+  scheduler needed).
+- **Overdue sweep** — the end-of-day list of knives still checked out. This one needs a
+  scheduled job to call the sweep on a timer; the preference and message are in place.
+
+Settings are saved to the `Setting` store (`teams.*` keys), and a **Send test message**
+button posts to the channel so you can confirm the webhook before relying on it.
 
 ## Ideas reserved for later
 
 - QR/barcode scanning — the schema already has a `scanCode` field per knife.
-- Connecting the email/SMS delivery layer to the alert preferences above.
+- A scheduled job to drive the Teams **overdue sweep** on a timer.

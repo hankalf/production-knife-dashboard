@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   STATUS_META,
   DISPLAY_ORDER,
@@ -10,7 +9,7 @@ import {
   normalizeType,
   type DisplayState,
 } from "@/lib/status";
-import { kioskAct, kioskIdentify, setKioskLockedWithPin } from "@/app/actions";
+import { kioskAct, kioskIdentify, kioskClean, type CleanAnswers } from "@/app/actions";
 
 export type KioskKnife = {
   id: number;
@@ -20,14 +19,21 @@ export type KioskKnife = {
   dueAtMs: number | null;
 };
 
-type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
-
 function stateOf(k: KioskKnife, now: number): DisplayState {
   if (k.status === "CHECKED_OUT" && k.dueAtMs && k.dueAtMs < now) return "OVERDUE";
   return k.status as DisplayState;
 }
 
-// What a floor worker can do to this knife straight from the kiosk.
+// Kiosk tiles are colored by knife TYPE: blue for Food Contact, silver for
+// Non-Food Contact. (Status is shown by the corner dot + the counts above.)
+function typeTile(type: string): string {
+  return normalizeType(type) === "NFC"
+    ? "bg-slate-300 text-slate-900 border-slate-400"
+    : "bg-blue-600 text-white border-blue-700";
+}
+
+type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
+
 function kioskActionFor(status: string): { action: KioskAction; label: string; role: string } | null {
   switch (status) {
     case "AVAILABLE":
@@ -35,10 +41,10 @@ function kioskActionFor(status: string): { action: KioskAction; label: string; r
     case "CHECKED_OUT":
       return { action: "RETURN", label: "Check in (return)", role: "Operator" };
     case "DIRTY":
-    case "CLEANED": // legacy state — cleaning also returns these to service
+    case "CLEANED":
       return { action: "CLEAN", label: "Clean & return to service", role: "Sanitation" };
     default:
-      return null; // OUT_OF_SERVICE is handled on the main board
+      return null; // DAMAGED / OUT_OF_SERVICE → managers handle on the main board
   }
 }
 
@@ -52,7 +58,6 @@ export default function KioskBoard({
   const router = useRouter();
   const [now, setNow] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [lockDialogOpen, setLockDialogOpen] = useState(false);
 
   useEffect(() => {
     setNow(Date.now());
@@ -80,39 +85,26 @@ export default function KioskBoard({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-1 gap-3">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <span aria-hidden>🔪</span> Safety Knife Status Board
-        </h1>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setLockDialogOpen(true)}
-            className={`text-sm rounded-lg px-3 py-1.5 border ${
-              locked
-                ? "bg-amber-500/20 border-amber-500 text-amber-200 hover:bg-amber-500/30"
-                : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
-            }`}
-          >
-            {locked ? "🔒 Locked — Unlock" : "🔓 Lock kiosk"}
-          </button>
-          <Link href="/" className="text-slate-400 text-sm hover:text-white">
-            Exit kiosk ✕
-          </Link>
-        </div>
-      </div>
+      <h1 className="text-3xl font-bold flex items-center gap-3 mb-1">
+        <span aria-hidden>🔪</span> Safety Knife Status Board
+      </h1>
       {locked ? (
-        <p className="text-amber-300 text-sm mb-4 flex items-center gap-2">
-          <span aria-hidden>🔒</span> View-only — a supervisor has locked the kiosk. Actions are
-          disabled until it&apos;s unlocked.
+        <p className="text-amber-300 text-sm mb-4">
+          🔒 View-only — the kiosk is locked. · Solo lectura — el kiosco está bloqueado.
         </p>
       ) : (
-        <p className="text-slate-400 text-sm mb-4">
-          Tap a knife, enter your PIN, and confirm your name — the app runs the right action
-          for your role (operators check out / in, sanitation cleans &amp; returns to service).
+        <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+          Tap a knife, enter your PIN, and confirm your name — the app runs the right action for
+          your role.
+          <br />
+          <span className="text-slate-500">
+            Toque un cuchillo, ingrese su PIN y confirme su nombre — la aplicación realiza la
+            acción correcta según su función.
+          </span>
         </p>
       )}
 
-      {/* Big status counts */}
+      {/* Status counts */}
       <div className="flex flex-wrap gap-3 mb-5">
         {DISPLAY_ORDER.map((s) => (
           <div
@@ -129,9 +121,21 @@ export default function KioskBoard({
       {overdue.length > 0 && (
         <div className="mb-5 rounded-xl bg-red-950 border border-red-700 px-5 py-4 text-red-200 text-xl font-semibold flex items-center gap-3">
           <span aria-hidden className="text-2xl">⚠️</span>
-          {overdue.length} OVERDUE — return &amp; clean now: {overdue.map((n) => `#${n}`).join("  ")}
+          {overdue.length} OVERDUE / VENCIDO — {overdue.map((n) => `#${n}`).join("  ")}
         </div>
       )}
+
+      {/* Type legend */}
+      <div className="flex flex-wrap gap-4 mb-3 text-sm">
+        <span className="flex items-center gap-2">
+          <span className="inline-block w-4 h-4 rounded bg-blue-600 border border-blue-700" />
+          FC — Food Contact / Contacto con alimentos
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="inline-block w-4 h-4 rounded bg-slate-300 border border-slate-400" />
+          NFC — Non-Food Contact / Sin contacto con alimentos
+        </span>
+      </div>
 
       {/* Grid — one numbered group per row (1–14, 51–64, 65–78) */}
       <div className="grid grid-cols-7 gap-2 md:grid-cols-[repeat(14,minmax(0,1fr))] content-start">
@@ -139,17 +143,17 @@ export default function KioskBoard({
           <button
             key={k.id}
             onClick={() => !locked && setSelectedId(k.id)}
-            className={`relative aspect-square rounded-xl border-2 flex items-center justify-center text-sm sm:text-base md:text-lg font-bold transition ${
-              STATUS_META[state].tile
-            } ${locked ? "cursor-default" : ""}`}
+            className={`relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
+              k.type
+            )} ${state === "OVERDUE" ? "ring-4 ring-red-500" : ""} ${locked ? "cursor-default" : ""}`}
             title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
           >
-            <span
-              className={`absolute top-0.5 left-0.5 rounded px-1 leading-tight text-[9px] sm:text-[10px] font-bold ${TYPE_META[normalizeType(k.type)].badge}`}
-            >
+            <span className="text-base sm:text-lg md:text-xl leading-none">#{k.number}</span>
+            <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-wide leading-none">
               {TYPE_META[normalizeType(k.type)].short}
             </span>
-            #{k.number}
+            {/* status dot */}
+            <span className={`absolute top-1 right-1 w-3 h-3 rounded-full ring-1 ring-black/20 ${STATUS_META[state].dot}`} />
           </button>
         ))}
       </div>
@@ -165,121 +169,6 @@ export default function KioskBoard({
           }}
         />
       )}
-
-      {lockDialogOpen && (
-        <LockDialog
-          locked={locked}
-          onClose={() => setLockDialogOpen(false)}
-          onDone={() => {
-            setLockDialogOpen(false);
-            router.refresh();
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function LockDialog({
-  locked,
-  onClose,
-  onDone,
-}: {
-  locked: boolean;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const nextLocked = !locked;
-
-  function submit() {
-    setError(null);
-    start(async () => {
-      const res = await setKioskLockedWithPin(nextLocked, pin);
-      if (res.ok) onDone();
-      else {
-        setError(res.error ?? "Failed.");
-        setPin("");
-      }
-    });
-  }
-
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white text-slate-900 w-full max-w-sm rounded-2xl shadow-xl p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">
-            {nextLocked ? "Lock kiosk" : "Unlock kiosk"}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 text-3xl leading-none px-2">
-            ×
-          </button>
-        </div>
-        <p className="text-sm text-slate-600 mb-4">
-          {nextLocked
-            ? "Puts the kiosk in view-only mode. Enter an admin or QA PIN to confirm."
-            : "Re-enables check out / check in / clean. Enter an admin or QA PIN to confirm."}
-        </p>
-        <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
-          {pin.replace(/./g, "•") || (
-            <span className="text-slate-300 tracking-normal text-base">admin / QA PIN</span>
-          )}
-        </div>
-        {error && (
-          <p className="text-center text-sm text-red-600 mb-3" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="grid grid-cols-3 gap-2">
-          {keys.map((d) => (
-            <button
-              key={d}
-              onClick={() => {
-                setError(null);
-                setPin((p) => (p.length >= 8 ? p : p + d));
-              }}
-              className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            onClick={() => setPin((p) => p.slice(0, -1))}
-            className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-lg"
-            aria-label="Delete"
-          >
-            ⌫
-          </button>
-          <button
-            onClick={() => {
-              setError(null);
-              setPin((p) => (p.length >= 8 ? p : p + "0"));
-            }}
-            className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
-          >
-            0
-          </button>
-          <button
-            onClick={submit}
-            disabled={pending || pin.length === 0}
-            className={`h-14 rounded-lg text-white font-semibold disabled:opacity-50 ${
-              nextLocked ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
-            }`}
-          >
-            {pending ? "…" : nextLocked ? "Lock" : "Unlock"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -295,9 +184,7 @@ function KioskModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  // Two-step flow: enter PIN → verify it's really you (name check) → the
-  // role-appropriate action runs.
-  const [step, setStep] = useState<"pin" | "confirm">("pin");
+  const [step, setStep] = useState<"pin" | "confirm" | "checklist">("pin");
   const [pin, setPin] = useState("");
   const [workerName, setWorkerName] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -305,7 +192,6 @@ function KioskModal({
   const [pending, start] = useTransition();
   const act = kioskActionFor(knife.status);
 
-  // Step 1: verify the PIN and find out who it belongs to.
   function identify() {
     if (!act) return;
     setError(null);
@@ -321,19 +207,32 @@ function KioskModal({
     });
   }
 
-  // Step 2: the worker confirmed it's them — run the action.
-  function execute() {
+  // Confirm "it's me": clean goes to the checklist; others run immediately.
+  function afterConfirm() {
     if (!act) return;
+    if (act.action === "CLEAN") {
+      setStep("checklist");
+      return;
+    }
+    const action = act.action as "CHECKOUT" | "RETURN";
     setError(null);
     start(async () => {
-      const res = await kioskAct(knife.id, act.action, pin, note);
+      const res = await kioskAct(knife.id, action, pin, note);
       if (res.ok) onDone();
       else {
-        // e.g. state changed since identify, or lock flipped on
         setError(res.error ?? "Action failed.");
         setStep("pin");
         setPin("");
       }
+    });
+  }
+
+  function submitClean(answers: CleanAnswers) {
+    setError(null);
+    start(async () => {
+      const res = await kioskClean(knife.id, pin, answers);
+      if (res.ok) onDone();
+      else setError(res.error ?? "Action failed.");
     });
   }
 
@@ -352,7 +251,7 @@ function KioskModal({
       onClick={onClose}
     >
       <div
-        className="bg-white text-slate-900 w-full max-w-sm rounded-2xl shadow-xl p-6"
+        className="bg-white text-slate-900 w-full max-w-sm rounded-2xl shadow-xl p-6 max-h-[92vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
@@ -361,119 +260,205 @@ function KioskModal({
             ×
           </button>
         </div>
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[state].dot}`} />
           <span className="font-medium">{STATUS_META[state].label}</span>
+          <span className={`ml-1 rounded px-2 py-0.5 text-xs font-bold ${TYPE_META[normalizeType(knife.type)].badge}`}>
+            {TYPE_META[normalizeType(knife.type)].label}
+          </span>
         </div>
 
         {!act ? (
           <p className="text-slate-600">
-            No kiosk action for this knife — it&apos;s out of service.
+            {knife.status === "DAMAGED"
+              ? "This knife is damaged — a manager will review it. · Este cuchillo está dañado — un gerente lo revisará."
+              : "No action for this knife — it's out of service. · Sin acción — fuera de servicio."}
           </p>
         ) : step === "pin" ? (
           <>
             <div className="rounded-lg bg-slate-100 px-4 py-3 mb-4 text-center">
               <div className="text-lg font-semibold">{act.label}</div>
-              <div className="text-xs text-slate-500">Enter your {act.role} PIN</div>
+              <div className="text-xs text-slate-500">Enter your {act.role} PIN · Ingrese su PIN</div>
             </div>
-
             <div className="h-12 mb-3 rounded-lg border border-slate-300 flex items-center justify-center tracking-[0.5em] text-2xl font-mono">
               {pin.replace(/./g, "•") || (
                 <span className="text-slate-300 tracking-normal text-base">enter PIN</span>
               )}
             </div>
-            {error && (
-              <p className="text-center text-sm text-red-600 mb-3" role="alert">
-                {error}
-              </p>
-            )}
+            {error && <p className="text-center text-sm text-red-600 mb-3" role="alert">{error}</p>}
             <div className="grid grid-cols-3 gap-2">
               {keys.map((d) => (
                 <button
                   key={d}
-                  onClick={() => {
-                    setError(null);
-                    setPin((p) => (p.length >= 8 ? p : p + d));
-                  }}
+                  onClick={() => { setError(null); setPin((p) => (p.length >= 8 ? p : p + d)); }}
                   className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
                 >
                   {d}
                 </button>
               ))}
-              <button
-                onClick={() => setPin((p) => p.slice(0, -1))}
-                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-lg"
-                aria-label="Delete"
-              >
-                ⌫
-              </button>
-              <button
-                onClick={() => {
-                  setError(null);
-                  setPin((p) => (p.length >= 8 ? p : p + "0"));
-                }}
-                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold"
-              >
-                0
-              </button>
+              <button onClick={() => setPin((p) => p.slice(0, -1))} className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-lg" aria-label="Delete">⌫</button>
+              <button onClick={() => { setError(null); setPin((p) => (p.length >= 8 ? p : p + "0")); }} className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 text-xl font-semibold">0</button>
               <button
                 onClick={identify}
                 disabled={pending || pin.length === 0}
                 className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
               >
-                {pending ? "…" : "Next"}
+                {pending ? "…" : "Next / Siguiente"}
+              </button>
+            </div>
+          </>
+        ) : step === "confirm" ? (
+          <>
+            <div className="rounded-lg bg-slate-100 px-4 py-4 mb-4 text-center">
+              <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                Verify it&apos;s you · Verifique que es usted
+              </div>
+              <div className="text-2xl font-bold">{workerName}</div>
+              <div className="text-sm text-slate-600 mt-2">{act.label} — knife #{knife.number}</div>
+            </div>
+            {act.action !== "CLEAN" && (
+              <>
+                <label className="block text-sm text-slate-600 mb-1">Note (optional) · Nota (opcional)</label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  placeholder="Add a note if needed…"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
+                />
+              </>
+            )}
+            {error && <p className="text-center text-sm text-red-600 mb-3" role="alert">{error}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={notMe} disabled={pending} className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50">
+                Not me · No soy yo
+              </button>
+              <button onClick={afterConfirm} disabled={pending} className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50">
+                {pending ? "…" : act.action === "CLEAN" ? "Yes — continue / Sí" : "Yes, that's me / Sí"}
               </button>
             </div>
           </>
         ) : (
-          <>
-            {/* Step 2: confirm identity, then act */}
-            <div className="rounded-lg bg-slate-100 px-4 py-4 mb-4 text-center">
-              <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                Verify it&apos;s you
-              </div>
-              <div className="text-2xl font-bold">{workerName}</div>
-              <div className="text-sm text-slate-600 mt-2">
-                {act.label} — knife #{knife.number}
-              </div>
-            </div>
-
-            <label className="block text-sm text-slate-600 mb-1">
-              {act.action === "CLEAN"
-                ? "Note (optional — e.g. residue found, extra sanitizing)"
-                : "Note (optional)"}
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Add a note if needed…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
-            />
-
-            {error && (
-              <p className="text-center text-sm text-red-600 mb-3" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={notMe}
-                disabled={pending}
-                className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50"
-              >
-                Not me
-              </button>
-              <button
-                onClick={execute}
-                disabled={pending}
-                className="h-14 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
-              >
-                {pending ? "…" : `Yes, that's me — ${act.action === "CLEAN" ? "clean" : act.action === "CHECKOUT" ? "check out" : "check in"}`}
-              </button>
-            </div>
-          </>
+          <CleanChecklist name={workerName} pending={pending} error={error} onCancel={notMe} onSubmit={submitClean} />
         )}
+      </div>
+    </div>
+  );
+}
+
+// Sanitation inspection checklist (bilingual). All four questions must be
+// answered; a damaged knife requires a reason and is sent to a manager.
+function CleanChecklist({
+  name,
+  pending,
+  error,
+  onCancel,
+  onSubmit,
+}: {
+  name: string | null;
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: (a: CleanAnswers) => void;
+}) {
+  const [cleaned, setCleaned] = useState<boolean | null>(null);
+  const [inspected, setInspected] = useState<boolean | null>(null);
+  const [condition, setCondition] = useState<"GOOD" | "DAMAGED" | null>(null);
+  const [reason, setReason] = useState("");
+
+  const ready =
+    cleaned !== null &&
+    inspected !== null &&
+    condition !== null &&
+    (condition !== "DAMAGED" || reason.trim().length > 0);
+
+  const YesNo = ({ value, set }: { value: boolean | null; set: (v: boolean) => void }) => (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        onClick={() => set(true)}
+        className={`rounded-lg py-2 text-sm font-semibold border ${value === true ? "bg-emerald-600 text-white border-transparent" : "bg-white border-slate-300"}`}
+      >
+        Yes / Sí
+      </button>
+      <button
+        onClick={() => set(false)}
+        className={`rounded-lg py-2 text-sm font-semibold border ${value === false ? "bg-red-600 text-white border-transparent" : "bg-white border-slate-300"}`}
+      >
+        No
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="text-sm text-slate-600">
+        Inspection by <span className="font-semibold">{name}</span> · Inspección por
+      </div>
+
+      <div>
+        <div className="text-sm font-medium mb-1">1. Cleaned? · ¿Limpiado?</div>
+        <YesNo value={cleaned} set={setCleaned} />
+      </div>
+      <div>
+        <div className="text-sm font-medium mb-1">2. Inspected? · ¿Inspeccionado?</div>
+        <YesNo value={inspected} set={setInspected} />
+      </div>
+      <div>
+        <div className="text-sm font-medium mb-1">3. Condition · Condición</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setCondition("GOOD")}
+            className={`rounded-lg py-2 text-sm font-semibold border ${condition === "GOOD" ? "bg-emerald-600 text-white border-transparent" : "bg-white border-slate-300"}`}
+          >
+            Good / Bueno
+          </button>
+          <button
+            onClick={() => setCondition("DAMAGED")}
+            className={`rounded-lg py-2 text-sm font-semibold border ${condition === "DAMAGED" ? "bg-rose-600 text-white border-transparent" : "bg-white border-slate-300"}`}
+          >
+            Damaged / Dañado
+          </button>
+        </div>
+      </div>
+
+      {condition === "DAMAGED" && (
+        <div>
+          <div className="text-sm font-medium mb-1">
+            4. Why is it damaged? · ¿Por qué está dañado?
+          </div>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="Describe the damage… · Describa el daño…"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-rose-600 mt-1">
+            A manager must return this knife to service. · Un gerente debe devolverlo al servicio.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-center text-sm text-red-600" role="alert">{error}</p>}
+
+      <div className="grid grid-cols-2 gap-2 pt-1">
+        <button onClick={onCancel} disabled={pending} className="h-12 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50">
+          Cancel · Cancelar
+        </button>
+        <button
+          onClick={() =>
+            onSubmit({
+              cleaned: cleaned === true,
+              inspected: inspected === true,
+              condition: condition ?? "GOOD",
+              damageReason: reason,
+            })
+          }
+          disabled={pending || !ready}
+          className="h-12 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
+        >
+          {pending ? "…" : "Submit · Enviar"}
+        </button>
       </div>
     </div>
   );

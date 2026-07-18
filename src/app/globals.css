@@ -12,6 +12,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+.dark body {
+  @apply bg-slate-900 text-slate-100;
+}
+
 /* Larger, touch-friendly controls by default (tablet-first). */
 button {
   touch-action: manipulation;

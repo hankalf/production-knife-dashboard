@@ -1,34 +1,27 @@
 import { prisma } from "./prisma";
 
-export async function getCheckoutWindowHours(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: "checkoutWindowHours" } });
-  const n = s ? Number(s.value) : 24;
-  return Number.isFinite(n) && n > 0 ? n : 24;
-}
-
-export type EmailSettings = {
+export type TeamsSettings = {
   enabled: boolean;
-  recipients: string; // raw comma-separated list
+  webhookUrl: string;
+  notifyDamaged: boolean;
   notifyOverdue: boolean;
-  notifyDailySweep: boolean;
 };
 
-const EMAIL_KEYS = [
-  "email.enabled",
-  "email.recipients",
-  "email.notifyOverdue",
-  "email.notifyDailySweep",
+const TEAMS_KEYS = [
+  "teams.enabled",
+  "teams.webhookUrl",
+  "teams.notifyDamaged",
+  "teams.notifyOverdue",
 ] as const;
 
-export async function getEmailSettings(): Promise<EmailSettings> {
-  const rows = await prisma.setting.findMany({ where: { key: { in: [...EMAIL_KEYS] } } });
+export async function getTeamsSettings(): Promise<TeamsSettings> {
+  const rows = await prisma.setting.findMany({ where: { key: { in: [...TEAMS_KEYS] } } });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
-    enabled: map.get("email.enabled") === "true",
-    recipients: map.get("email.recipients") ?? "",
-    // categories default to on so they're pre-checked when first enabling
-    notifyOverdue: (map.get("email.notifyOverdue") ?? "true") === "true",
-    notifyDailySweep: (map.get("email.notifyDailySweep") ?? "true") === "true",
+    enabled: map.get("teams.enabled") === "true",
+    webhookUrl: map.get("teams.webhookUrl") ?? "",
+    notifyDamaged: (map.get("teams.notifyDamaged") ?? "true") === "true",
+    notifyOverdue: (map.get("teams.notifyOverdue") ?? "true") === "true",
   };
 }
 

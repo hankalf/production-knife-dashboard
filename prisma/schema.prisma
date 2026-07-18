@@ -12,9 +12,10 @@ model Knife {
   id       Int    @id @default(autoincrement())
   number   String @unique // printed label, e.g. "53"
   sortKey  Int    // numeric value of `number` for stable ordering
-  status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DIRTY | CLEANED | OUT_OF_SERVICE
+  status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DIRTY | CLEANED | DAMAGED | OUT_OF_SERVICE
   type     String @default("FC") // FC (Food Contact) | NFC (Non-Food Contact)
   scanCode String? @unique // reserved for future QR/barcode support
+  damageNote String? // set when sanitation flags a knife damaged; cleared on manager return
 
   // current-cycle fields (cleared when the knife returns to AVAILABLE)
   checkedOutById Int?

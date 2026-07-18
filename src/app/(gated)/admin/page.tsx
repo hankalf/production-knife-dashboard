@@ -1,49 +1,31 @@
 import Link from "next/link";
-import { getCurrentWorker, getAdminGateWorkerId } from "@/lib/session";
-import { canAccessAdmin } from "@/lib/status";
-import {
-  getWorkers,
-  getCheckoutWindowHours,
-  getRecentEvents,
-  getEmailSettings,
-  getKioskLocked,
-} from "@/lib/data";
-import { ACTION_LABEL } from "@/lib/status";
+import { getCurrentWorker } from "@/lib/session";
+import { canAccessAdmin, ACTION_LABEL } from "@/lib/status";
+import { getWorkers, getRecentEvents, getTeamsSettings, getKioskLocked } from "@/lib/data";
 import { AdminPanel } from "@/components/AdminPanel";
-import { AdminGatePad } from "@/components/SessionControls";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const [worker, gateId] = await Promise.all([getCurrentWorker(), getAdminGateWorkerId()]);
-  const unlocked = !!worker && gateId === worker.id && canAccessAdmin(worker.roles);
-
-  // Always require a fresh PIN on the admin page before revealing the dashboard,
-  // even if the worker is already signed in on the board.
-  if (!unlocked) {
+  const worker = await getCurrentWorker();
+  // The (gated) layout already limits this area to admins/QA and no second
+  // sign-in is needed here. Keep a defensive check just in case.
+  if (!worker || !canAccessAdmin(worker.roles)) {
     return (
-      <div className="max-w-md mx-auto py-10 space-y-6">
-        <div className="text-center">
-          <h1 className="text-xl font-bold mb-1">Admin panel</h1>
-          <p className="text-slate-500 text-sm">
-            Enter your PIN to continue. Only admins and QA can open this panel.
-          </p>
-        </div>
-        <AdminGatePad />
-        <div className="text-center">
-          <Link href="/" className="text-sky-700 underline text-sm">
-            ← Back to fleet
-          </Link>
-        </div>
+      <div className="max-w-md mx-auto text-center py-12">
+        <h1 className="text-xl font-bold mb-2">No access</h1>
+        <Link href="/kiosk" className="text-sky-700 underline">
+          Open the kiosk
+        </Link>
       </div>
     );
   }
 
-  const [workers, hours, events, emailSettings, kioskLocked] = await Promise.all([
+  const [workers, events, teamsSettings, kioskLocked] = await Promise.all([
     getWorkers(),
-    getCheckoutWindowHours(),
     getRecentEvents(50),
-    getEmailSettings(),
+    getTeamsSettings(),
     getKioskLocked(),
   ]);
 
@@ -51,15 +33,17 @@ export default async function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Admin</h1>
-        <Link href="/" className="text-sm text-sky-700 underline">
-          ← Back to fleet
-        </Link>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <Link href="/" className="text-sm text-sky-700 dark:text-sky-400 underline">
+            ← Back to fleet
+          </Link>
+        </div>
       </div>
 
       <AdminPanel
-        checkoutWindowHours={hours}
         kioskLocked={kioskLocked}
-        emailSettings={emailSettings}
+        teamsSettings={teamsSettings}
         workers={workers.map((w) => ({
           id: w.id,
           name: w.name,
@@ -68,19 +52,19 @@ export default async function AdminPage() {
         }))}
       />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Recent activity (audit log)</h2>
           <a
             href="/api/export"
-            className="rounded-lg bg-slate-800 text-white text-sm px-3 py-2 hover:bg-slate-700"
+            className="rounded-lg bg-slate-800 dark:bg-slate-600 text-white text-sm px-3 py-2 hover:bg-slate-700"
           >
             Export full log (CSV)
           </a>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-slate-500 border-b">
+            <thead className="text-left text-slate-500 dark:text-slate-400 border-b dark:border-slate-700">
               <tr>
                 <th className="py-2 pr-4">When</th>
                 <th className="py-2 pr-4">Knife</th>
@@ -91,14 +75,14 @@ export default async function AdminPage() {
             </thead>
             <tbody>
               {events.map((e) => (
-                <tr key={e.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                <tr key={e.id} className="border-b last:border-0 dark:border-slate-700">
+                  <td className="py-2 pr-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                     {e.createdAt.toLocaleString()}
                   </td>
                   <td className="py-2 pr-4 font-medium">#{e.knife.number}</td>
                   <td className="py-2 pr-4">{ACTION_LABEL[e.action] ?? e.action}</td>
                   <td className="py-2 pr-4">{e.worker?.name ?? "—"}</td>
-                  <td className="py-2 pr-4 text-slate-500">{e.note ?? ""}</td>
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{e.note ?? ""}</td>
                 </tr>
               ))}
               {events.length === 0 && (

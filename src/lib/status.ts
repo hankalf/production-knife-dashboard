@@ -5,6 +5,7 @@ export const STATUS = {
   CHECKED_OUT: "CHECKED_OUT",
   DIRTY: "DIRTY",
   CLEANED: "CLEANED",
+  DAMAGED: "DAMAGED",
   OUT_OF_SERVICE: "OUT_OF_SERVICE",
 } as const;
 
@@ -85,6 +86,11 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
     tile: "bg-violet-500 hover:bg-violet-600 text-white border-violet-600",
     dot: "bg-violet-500",
   },
+  DAMAGED: {
+    label: "Damaged — needs manager",
+    tile: "bg-rose-600 hover:bg-rose-700 text-white border-rose-700",
+    dot: "bg-rose-600",
+  },
   OUT_OF_SERVICE: {
     label: "Out of service",
     tile: "bg-slate-400 hover:bg-slate-500 text-white border-slate-500",
@@ -99,6 +105,7 @@ export const DISPLAY_ORDER: DisplayState[] = [
   "CHECKED_OUT",
   "OVERDUE",
   "DIRTY",
+  "DAMAGED",
   "OUT_OF_SERVICE",
 ];
 
@@ -154,4 +161,6 @@ export const ACTION_LABEL: Record<string, string> = {
   RESTORE: "Restored",
   ADD: "Added to fleet",
   RETYPE: "Type changed",
+  DAMAGE: "Flagged damaged",
+  MANAGER_RETURN: "Returned to service (manager)",
 };
