@@ -16,6 +16,7 @@ model Knife {
   type     String @default("FC") // FC (Food Contact) | NFC (Non-Food Contact)
   scanCode String? @unique // reserved for future QR/barcode support
   damageNote String? // set when sanitation flags a knife damaged; cleared on manager return
+  damagePhoto String? // optional data-URL photo captured when flagging damage; cleared with the note
 
   // current-cycle fields (cleared when the knife returns to AVAILABLE)
   checkedOutById Int?

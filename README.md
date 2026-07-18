@@ -24,11 +24,12 @@ Before a used knife goes back in service, **sanitation answers a 4-question chec
 1. **Cleaned?** Yes / No
 2. **Inspected?** Yes / No
 3. **Condition** — Good or Damaged
-4. If **Damaged**, describe why
+4. If **Damaged**, describe why — and optionally **attach a photo** (captured on the tablet,
+   downscaled on-device)
 
 A **Good** knife (cleaned **and** inspected) returns straight to service. A **Damaged** knife
-moves to a **DAMAGED** state with the reported reason, and **only a manager (admin)** can
-return it to service from the board.
+moves to a **DAMAGED** state with the reported reason and photo, and **only a manager (admin)**
+can return it to service from the board (where the manager sees the reason and photo).
 
 - **Overdue** is derived (a checked-out knife past its due date), shown in red with a banner.
 - **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
@@ -48,7 +49,9 @@ adding a knife, or change it later from the knife's action modal (admin/QA). New
 default to FC.
 
 > Due dates use the **server's local time** — set the `TZ` environment variable (e.g.
-> `TZ=America/Chicago`) on your host so "end of day/Friday" matches the plant's timezone.
+> `TZ=America/Chicago`) so "end of day/Friday" matches the plant's timezone. The active
+> timezone and current server time are shown in **Admin → Advanced → System** so you can
+> confirm it at a glance. `render.yaml` sets `TZ` for Render; on Railway add it as a variable.
 
 ## Roles (identified by PIN)
 
@@ -139,6 +142,8 @@ To run the whole app in containers instead, use the **`claude/docker-desktop`** 
 
 - `npm run db:migrate:dev` — create a new migration after editing the schema
 - `npm run db:reset` — drop, re-migrate, and re-seed the database
+- `npm run db:backup` — gzip a `pg_dump` of the database to `./backups/`
+- `npm run test:e2e` — run the Playwright end-to-end suite
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
 
@@ -203,6 +208,40 @@ URL** for a Teams channel, enable it, and choose what to be notified about:
 
 Settings are saved to the `Setting` store (`teams.*` keys), and a **Send test message**
 button posts to the channel so you can confirm the webhook before relying on it.
+
+## Testing
+
+End-to-end tests (Playwright) cover the critical flows: kiosk access/bilingual copy, the
+admin/QA gate on the board, the full kiosk lifecycle (checkout → holder shown → check-in →
+sanitation "Good" → available), and the damaged → manager-return path.
+
+```bash
+# Against a server Playwright starts itself (production build):
+npm run build
+npm run test:e2e
+
+# Against an already-running dev server:
+PW_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+The tests run against a real PostgreSQL database and assert on persisted state. CI runs them
+on every push/PR via `.github/workflows/e2e.yml` (spins up Postgres, migrates, seeds, builds,
+and runs the suite).
+
+## Database backups
+
+The audit log is the compliance backbone, so back the database up regularly.
+
+```bash
+npm run db:backup            # writes ./backups/knife-backup-<timestamp>.sql.gz
+BACKUP_DIR=/mnt/nas npm run db:backup
+```
+
+`scripts/backup.sh` runs `pg_dump` against `DATABASE_URL` (loading it from `.env` if needed),
+gzips the dump, and keeps the newest 30 (override with `BACKUP_KEEP`). To run it on a
+schedule, add a cron entry on the host, a **Railway cron service**, or a **Render cron job**
+that runs `npm run db:backup` and ships the file to durable storage. Railway and Render also
+provide their own managed Postgres backups — this script is for portable, off-host copies.
 
 ## Ideas reserved for later
 

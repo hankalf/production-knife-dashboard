@@ -45,6 +45,15 @@ export default async function AdminPage() {
       <AdminPanel
         logoDataUrl={logoDataUrl}
         knives={knives.map((k) => ({ id: k.id, number: k.number, type: k.type, status: k.status }))}
+        system={{
+          timeZone:
+            process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          serverTime: new Date().toLocaleString("en-US", {
+            timeZone: process.env.TZ || undefined,
+            dateStyle: "medium",
+            timeStyle: "short",
+          }),
+        }}
         teamsSettings={teamsSettings}
         workers={workers.map((w) => ({
           id: w.id,

@@ -21,6 +21,7 @@ export default async function DashboardPage() {
     checkedOutAtMs: k.checkedOutAt ? k.checkedOutAt.getTime() : null,
     holderName: k.checkedOutBy?.name ?? null,
     damageNote: k.damageNote ?? null,
+    damagePhoto: k.damagePhoto ?? null,
   }));
 
   return (
