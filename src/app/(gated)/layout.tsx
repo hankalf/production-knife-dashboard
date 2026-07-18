@@ -17,12 +17,12 @@ export default async function GatedLayout({
 
   if (!worker) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col items-center justify-center gap-6 px-4">
+      <div className="fixed inset-0 z-50 bg-slate-100 dark:bg-slate-900 dark:text-slate-100 flex flex-col items-center justify-center gap-6 px-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
             <span aria-hidden>🔪</span> Safety Knife Checkout
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Admins &amp; QA — enter your PIN to continue.
           </p>
         </div>
@@ -37,9 +37,9 @@ export default async function GatedLayout({
   // Signed in, but operators/sanitation don't get the fleet or admin panel.
   if (!canAccessAdmin(worker.roles)) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col items-center justify-center gap-4 px-4 text-center">
+      <div className="fixed inset-0 z-50 bg-slate-100 dark:bg-slate-900 dark:text-slate-100 flex flex-col items-center justify-center gap-4 px-4 text-center">
         <h1 className="text-2xl font-bold">This area is for admins &amp; QA</h1>
-        <p className="text-slate-500 max-w-sm">
+        <p className="text-slate-500 dark:text-slate-400 max-w-sm">
           You&apos;re signed in as {worker.name}. Employees use the kiosk to check knives
           out, in, and clean them.
         </p>

@@ -2,9 +2,9 @@ import { STATUS_META, DISPLAY_ORDER, TYPE_META, KNIFE_TYPE } from "@/lib/status"
 
 export function Legend() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-700 mb-2">Legend</h2>
-      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+      <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Legend</h2>
+      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
         {DISPLAY_ORDER.map((s) => (
           <div key={s} className="flex items-center gap-2">
             <span className={`inline-block w-3 h-3 rounded-full ${STATUS_META[s].dot}`} />
@@ -12,8 +12,8 @@ export function Legend() {
           </div>
         ))}
       </div>
-      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
-        <span className="text-xs font-semibold text-slate-500 self-center">Type (corner badge):</span>
+      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 self-center">Type (corner badge):</span>
         {Object.values(KNIFE_TYPE).map((t) => (
           <div key={t} className="flex items-center gap-2">
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_META[t].badge}`}>

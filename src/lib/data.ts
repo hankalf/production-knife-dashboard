@@ -25,6 +25,13 @@ export async function getTeamsSettings(): Promise<TeamsSettings> {
   };
 }
 
+// Optional company logo shown in the kiosk's top-left corner. Stored as a
+// data: URL in Settings so no file hosting is needed.
+export async function getLogoDataUrl(): Promise<string | null> {
+  const s = await prisma.setting.findUnique({ where: { key: "branding.logoDataUrl" } });
+  return s?.value ? s.value : null;
+}
+
 // When true, the shared kiosk is view-only until a supervisor unlocks it.
 export async function getKioskLocked(): Promise<boolean> {
   const s = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });

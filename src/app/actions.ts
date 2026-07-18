@@ -742,6 +742,30 @@ export async function sendTeamsTest(): Promise<ActionResult> {
   return err ? fail(err) : ok();
 }
 
+// ---- Company logo (kiosk branding) ----------------------------------------
+
+// Save (or clear) the company logo shown in the kiosk's top-left corner.
+// The logo is stored as a data: URL. Pass an empty string to remove it.
+export async function updateLogo(dataUrl: string): Promise<ActionResult> {
+  const auth = await requirePanelAccess();
+  if (!auth.ok) return fail(auth.error);
+  const value = (dataUrl || "").trim();
+  if (value) {
+    if (!/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/.test(value)) {
+      return fail("Upload a PNG, JPG, GIF, WEBP, or SVG image.");
+    }
+    // Data URLs are stored inline; keep them small (~700 KB of base64 ≈ 512 KB image).
+    if (value.length > 700_000) return fail("Image is too large — use one under 500 KB.");
+  }
+  await prisma.setting.upsert({
+    where: { key: "branding.logoDataUrl" },
+    update: { value },
+    create: { key: "branding.logoDataUrl", value },
+  });
+  revalidatePath("/", "layout");
+  return ok();
+}
+
 // ---- Bulk worker upload (CSV) ---------------------------------------------
 
 export type BulkResult = { ok: boolean; added: number; skipped: number; errors: string[] };
