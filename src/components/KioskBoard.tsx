@@ -17,6 +17,7 @@ export type KioskKnife = {
   status: string;
   type: string;
   dueAtMs: number | null;
+  holderName: string | null;
 };
 
 function stateOf(k: KioskKnife, now: number): DisplayState {
@@ -106,12 +107,10 @@ export default function KioskBoard({
         </p>
       ) : (
         <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-          Tap a knife, enter your PIN, and confirm your name — the app runs the right action for
-          your role.
+          Tap a knife, enter your PIN, and confirm your name.
           <br />
           <span className="text-slate-500">
-            Toque un cuchillo, ingrese su PIN y confirme su nombre — la aplicación realiza la
-            acción correcta según su función.
+            Toque un cuchillo, ingrese su PIN y confirme su nombre.
           </span>
         </p>
       )}
@@ -164,6 +163,12 @@ export default function KioskBoard({
             <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-wide leading-none">
               {TYPE_META[normalizeType(k.type)].short}
             </span>
+            {/* who has it checked out */}
+            {k.status === "CHECKED_OUT" && k.holderName && (
+              <span className="mt-0.5 w-full truncate px-1 text-center text-[10px] sm:text-xs font-medium leading-tight">
+                {k.holderName}
+              </span>
+            )}
             {/* status dot */}
             <span className={`absolute top-1 right-1 w-3 h-3 rounded-full ring-1 ring-black/20 ${STATUS_META[state].dot}`} />
           </button>
@@ -199,7 +204,6 @@ function KioskModal({
   const [step, setStep] = useState<"pin" | "confirm" | "checklist">("pin");
   const [pin, setPin] = useState("");
   const [workerName, setWorkerName] = useState<string | null>(null);
-  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const act = kioskActionFor(knife.status);
@@ -229,7 +233,7 @@ function KioskModal({
     const action = act.action as "CHECKOUT" | "RETURN";
     setError(null);
     start(async () => {
-      const res = await kioskAct(knife.id, action, pin, note);
+      const res = await kioskAct(knife.id, action, pin);
       if (res.ok) onDone();
       else {
         setError(res.error ?? "Action failed.");
@@ -328,18 +332,6 @@ function KioskModal({
               <div className="text-2xl font-bold">{workerName}</div>
               <div className="text-sm text-slate-600 mt-2">{act.label} — knife #{knife.number}</div>
             </div>
-            {act.action !== "CLEAN" && (
-              <>
-                <label className="block text-sm text-slate-600 mb-1">Note (optional) · Nota (opcional)</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={2}
-                  placeholder="Add a note if needed…"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 mb-4 text-sm"
-                />
-              </>
-            )}
             {error && <p className="text-center text-sm text-red-600 mb-3" role="alert">{error}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button onClick={notMe} disabled={pending} className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50">
