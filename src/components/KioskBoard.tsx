@@ -51,9 +51,11 @@ function kioskActionFor(status: string): { action: KioskAction; label: string; r
 export default function KioskBoard({
   knives,
   locked,
+  logoDataUrl,
 }: {
   knives: KioskKnife[];
   locked: boolean;
+  logoDataUrl?: string | null;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(0);
@@ -86,7 +88,17 @@ export default function KioskBoard({
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col p-6 overflow-auto">
       <h1 className="text-3xl font-bold flex items-center gap-3 mb-1">
-        <span aria-hidden>🔪</span> Safety Knife Status Board
+        {logoDataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoDataUrl}
+            alt="Company logo"
+            className="h-10 w-auto max-w-[180px] object-contain rounded bg-white/5 p-0.5"
+          />
+        ) : (
+          <span aria-hidden>🔪</span>
+        )}
+        Safety Knife Check-in / Checkout
       </h1>
       {locked ? (
         <p className="text-amber-300 text-sm mb-4">

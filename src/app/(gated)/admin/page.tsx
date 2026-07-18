@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentWorker } from "@/lib/session";
 import { canAccessAdmin, ACTION_LABEL } from "@/lib/status";
-import { getWorkers, getRecentEvents, getTeamsSettings, getKioskLocked } from "@/lib/data";
+import { getWorkers, getRecentEvents, getTeamsSettings, getKioskLocked, getLogoDataUrl } from "@/lib/data";
 import { AdminPanel } from "@/components/AdminPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -22,11 +22,12 @@ export default async function AdminPage() {
     );
   }
 
-  const [workers, events, teamsSettings, kioskLocked] = await Promise.all([
+  const [workers, events, teamsSettings, kioskLocked, logoDataUrl] = await Promise.all([
     getWorkers(),
     getRecentEvents(50),
     getTeamsSettings(),
     getKioskLocked(),
+    getLogoDataUrl(),
   ]);
 
   return (
@@ -43,6 +44,7 @@ export default async function AdminPage() {
 
       <AdminPanel
         kioskLocked={kioskLocked}
+        logoDataUrl={logoDataUrl}
         teamsSettings={teamsSettings}
         workers={workers.map((w) => ({
           id: w.id,

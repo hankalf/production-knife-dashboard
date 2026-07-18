@@ -90,8 +90,10 @@ surfaces are gated very differently:
   the audit trail. Cleaning runs the 4-question sanitation checklist. (A supervisor can still
   lock the kiosk to view-only from **Admin → Kiosk mode**; it's enforced server-side.)
 - **`/admin`** *(admin/QA)* — add knives, retire/restore, manage workers (including
-  **CSV bulk upload**), configure **Teams alerts** (see below), export the full audit log to
-  CSV, and toggle **light/dark mode** from the header.
+  **CSV bulk upload**), upload a **company logo** for the kiosk, configure **Teams alerts**
+  (see below), export the full audit log to CSV, and toggle **light/dark mode** from the
+  header. The light/dark choice applies across the management surfaces (board, reports,
+  admin, knife history); the kiosk keeps its own high-contrast dark display.
 - **`/knife/<number>`** *(admin/QA)* — a single knife's complete lifecycle history.
 
 ## Tech stack

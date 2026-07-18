@@ -11,6 +11,7 @@ import {
   updateTeamsSettings,
   sendTeamsTest,
   bulkAddWorkers,
+  updateLogo,
   setKioskLocked,
   type ActionResult,
 } from "@/app/actions";
@@ -24,10 +25,12 @@ type WorkerRow = { id: number; name: string; roles: string; active: boolean };
 
 export function AdminPanel({
   kioskLocked,
+  logoDataUrl,
   teamsSettings,
   workers,
 }: {
   kioskLocked: boolean;
+  logoDataUrl: string | null;
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
@@ -38,9 +41,69 @@ export function AdminPanel({
         <KioskLockCard locked={kioskLocked} />
         <AddWorkerCard />
         <WorkersCard workers={workers} />
+        <BrandingCard logoDataUrl={logoDataUrl} />
       </div>
       <TeamsCard settings={teamsSettings} />
     </div>
+  );
+}
+
+function BrandingCard({ logoDataUrl }: { logoDataUrl: string | null }) {
+  const { pending, msg, run } = useRun();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500_000) {
+      // Surface the same message the server would, before reading.
+      run(() => Promise.resolve({ ok: false, error: "Image is too large — use one under 500 KB." }), "");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => run(() => updateLogo(String(reader.result ?? "")), "Logo updated.");
+    reader.readAsDataURL(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  return (
+    <Card title="Kiosk logo">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        Shown in the top-left corner of the kiosk board. PNG, JPG, or SVG under 500&nbsp;KB.
+      </p>
+      <div className="flex items-center gap-4">
+        <div className="h-14 w-32 shrink-0 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 flex items-center justify-center overflow-hidden">
+          {logoDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoDataUrl} alt="Current logo" className="max-h-12 max-w-[112px] object-contain" />
+          ) : (
+            <span className="text-2xl" aria-hidden>🔪</span>
+          )}
+        </div>
+        <div className="space-y-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+            onChange={onFile}
+            disabled={pending}
+            className="text-sm block"
+          />
+          {logoDataUrl && (
+            <button
+              type="button"
+              onClick={() => run(() => updateLogo(""), "Logo removed.")}
+              disabled={pending}
+              className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+            >
+              Remove logo
+            </button>
+          )}
+        </div>
+      </div>
+      <Msg msg={msg} />
+    </Card>
   );
 }
 
