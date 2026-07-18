@@ -9,6 +9,8 @@ WORKDIR /app
 # --- Install dependencies ---
 FROM base AS deps
 COPY package.json package-lock.json ./
+# prisma/ must be present because the postinstall script runs `prisma generate`.
+COPY prisma ./prisma
 RUN npm ci
 
 # --- Build ---
