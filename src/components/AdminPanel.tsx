@@ -460,8 +460,8 @@ function AddWorkerSection() {
               onClick={() => toggle(r)}
               className={`rounded-full border px-3 py-1.5 text-sm ${
                 roles.includes(r)
-                  ? "border-slate-800 bg-slate-800 text-white"
-                  : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                  ? "border-sky-500 bg-sky-600 text-white shadow-sm"
+                  : "border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
               }`}
             >
               {r}
@@ -624,8 +624,8 @@ function EmployeeRow({ worker }: { worker: WorkerRow }) {
               onClick={() => toggle(r)}
               className={`rounded-full border px-3 py-1.5 text-sm ${
                 roles.includes(r)
-                  ? "border-slate-800 bg-slate-800 text-white"
-                  : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                  ? "border-sky-500 bg-sky-600 text-white shadow-sm"
+                  : "border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
               }`}
             >
               {r}
