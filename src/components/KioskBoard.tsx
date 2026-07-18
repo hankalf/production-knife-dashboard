@@ -179,17 +179,20 @@ export default function KioskBoard({
           as large as possible and the whole board fits a landscape iPad with no
           scrolling. Text scales with vmin so it tracks the bubble size. */}
       <div className="flex-1 min-h-0">
-        <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-x-1.5 lg:gap-x-2 h-full w-full content-around">
+        <div
+          className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1.5 lg:gap-2 h-full w-full"
+          style={{ gridAutoRows: "minmax(0, 1fr)" }}
+        >
           {withState.map(({ k, state }) => (
             <button
               key={k.id}
               onClick={() => !locked && setSelectedId(k.id)}
-              className={`relative aspect-square rounded-lg lg:rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
+              className={`relative min-h-0 rounded-lg lg:rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
                 k.type
               )} ${state === "OVERDUE" ? "ring-2 lg:ring-4 ring-red-500" : ""} ${locked ? "cursor-default" : ""}`}
               title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
-              <span className="leading-none font-extrabold" style={{ fontSize: "clamp(0.8rem, 3.4vmin, 2.2rem)" }}>
+              <span className="leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}>
                 #{k.number}
               </span>
               <span
