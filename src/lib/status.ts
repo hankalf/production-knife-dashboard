@@ -161,6 +161,7 @@ export const ACTION_LABEL: Record<string, string> = {
   RESTORE: "Restored",
   ADD: "Added to fleet",
   RETYPE: "Type changed",
+  EDIT: "Edited",
   DAMAGE: "Flagged damaged",
   MANAGER_RETURN: "Returned to service (manager)",
 };

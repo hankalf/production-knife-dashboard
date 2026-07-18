@@ -33,6 +33,15 @@ function typeTile(type: string): string {
     : "bg-blue-600 text-white border-blue-700";
 }
 
+// Compact holder label for the small kiosk tile: "First L." Parentheticals
+// (e.g. a seeded "Olivia (Operator)") are stripped first.
+function shortName(full: string): string {
+  const parts = full.replace(/\([^)]*\)/g, "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return full.trim();
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
 
 function kioskActionFor(status: string): { action: KioskAction; label: string; role: string } | null {
@@ -166,7 +175,7 @@ export default function KioskBoard({
             {/* who has it checked out */}
             {k.status === "CHECKED_OUT" && k.holderName && (
               <span className="mt-0.5 w-full truncate px-1 text-center text-[10px] sm:text-xs font-medium leading-tight">
-                {k.holderName}
+                {shortName(k.holderName)}
               </span>
             )}
             {/* status dot */}

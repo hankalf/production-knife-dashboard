@@ -89,7 +89,8 @@ surfaces are gated very differently:
   kiosk, confirming each action with their PIN. A checked-out knife's bubble shows **who has
   it out**. Cleaning runs the 4-question sanitation checklist. An optional **company logo**
   shows in the top-left corner.
-- **`/admin`** *(admin/QA)* — add knives, retire/restore, manage workers (including
+- **`/admin`** *(admin/QA)* — add knives and **manage the whole fleet** (edit a knife's
+  number/type, or remove a mis-added one), retire/restore, manage workers (including
   **CSV bulk upload**), upload a **company logo** for the kiosk, configure **Teams alerts**
   (see below), export the full audit log to CSV, and toggle **light/dark mode** from the
   header. The light/dark choice applies across the management surfaces (board, reports,
