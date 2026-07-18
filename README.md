@@ -49,7 +49,7 @@ adding a knife, or change it later from the knife's action modal (admin/QA). New
 default to FC.
 
 > Due dates use the **server's local time** — set the `TZ` environment variable (e.g.
-> `TZ=America/Chicago`) so "end of day/Friday" matches the plant's timezone. The active
+> `TZ=America/New_York` for Eastern) so "end of day/Friday" matches the plant's timezone. The active
 > timezone and current server time are shown in **Admin → Advanced → System** so you can
 > confirm it at a glance. `render.yaml` sets `TZ` for Render; on Railway add it as a variable.
 
