@@ -1,0 +1,15 @@
+# Keep the build context small — this matters a lot on a Pi, where sending a
+# node_modules tree to the daemon can take longer than the build.
+node_modules
+.next
+.git
+.github
+e2e
+playwright.config.ts
+test-results
+playwright-report
+.env
+.env.*
+!.env.example
+npm-debug.log*
+README.md

@@ -35,3 +35,9 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /.playwright/
+
+# Secrets — this repo is public, never commit these.
+.env
+.env.local
+.env.*.local
+!.env.example

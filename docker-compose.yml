@@ -1,0 +1,49 @@
+# Self-host the knife dashboard on a LAN box (the Pi dashboard server).
+#
+#   1. cp .env.example .env  and set POSTGRES_PASSWORD
+#   2. docker compose up -d --build
+#
+# Data lives in the named `knife_pgdata` volume, so it survives restarts and
+# rebuilds. `main` still deploys to Railway/Render from source; this file is
+# only for the self-hosted path.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-knife}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-knifedb}
+    # Deliberately no `ports:` mapping. The app reaches the database over the
+    # compose network by service name, so nothing needs to publish 5432 — and
+    # publishing it would put Postgres on the whole LAN, because Docker writes
+    # its own iptables rules and bypasses ufw entirely.
+    # To inspect it by hand:  docker compose exec db psql -U knife -d knifedb
+    volumes:
+      - knife_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-knife} -d ${POSTGRES_DB:-knifedb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      # The db service name resolves on the compose network; not localhost.
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-knife}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-knifedb}?schema=public"
+      NODE_ENV: production
+      # Drives the FC/NFC due-date cut-offs. A container defaults to UTC, which
+      # would shift "end of today" by several hours against the shop floor.
+      TZ: ${TZ:-America/New_York}
+    ports:
+      # APP_PORT lets one host run this alongside other dashboards without
+      # editing this file; the container always listens on 3000 internally.
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  knife_pgdata:
