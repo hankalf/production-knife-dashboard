@@ -145,6 +145,8 @@ To run the whole app in containers instead, use the **`claude/docker-desktop`** 
 - `npm run db:reset` — drop, re-migrate, and re-seed the database
 - `npm run db:backup` — gzip a `pg_dump` of the database to `./backups/`
 - `npm run test:e2e` — run the Playwright end-to-end suite
+- `node docs/capture_sop_shots.mjs` — refresh the SOP screenshots (app must be running;
+  set `PW_BASE_URL`, and `TZ` on the server so times look right)
 - `python3 docs/build_sop.py` — regenerate the SOP PDF (`docs/Safety-Knife-Checkout-SOP.pdf`)
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
