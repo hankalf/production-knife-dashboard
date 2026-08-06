@@ -267,7 +267,7 @@ def build():
          ["7", "Damaged knives — manager review"],
          ["8", "Manager tasks on the fleet board"],
          ["9", "Reports"],
-         ["10", "Advanced: every admin setting and what it does"],
+         ["10", "Advanced: every admin setting and what it does (and what a manager sees)"],
          ["11", "Troubleshooting"]],
         [0.4 * inch, W - 0.4 * inch], header=False, zebra=False))
 
@@ -298,8 +298,9 @@ def build():
         [["Role", "Can do"],
          ["Operator", "Check out an available knife; check in the knife <b>they</b> checked out."],
          ["Sanitation", "Clean and inspect used knives, returning good ones to service or flagging damage."],
-         ["QA", "View the fleet board, reports, and admin panel (supervisory access)."],
-         ["Admin (Manager)", "Everything above, plus return damaged knives to service, manage knives and employees, and configure the system."]],
+         ["QA", "Everything a supervisor needs: the fleet board, reports, and the full admin panel."],
+         ["<b>Manager</b>", "A floor supervisor. Does <b>every</b> operator, sanitation, and QA job, reviews <b>damaged</b> knives, and can <b>view</b> the knife fleet and audit log — but <b>cannot change anything</b> in the admin panel (see section 10)."],
+         ["Admin", "Everything, including adding knives, managing employees, and configuring the system."]],
         [1.25 * inch, W - 1.25 * inch]))
     s.append(Spacer(1, 10))
     s.append(callout(
@@ -435,10 +436,10 @@ def build():
         [["Action", "Who", "When it appears"],
          ["Check out / Return (mark used)", "Operator (admins included)", "Same lifecycle actions as the kiosk."],
          ["Clean &amp; return to service", "Sanitation (admins included)", "Knife is awaiting sanitation."],
-         ["<b>Return to service (manager)</b>", "Admin only", "Knife is Damaged — clears the damage note and photo."],
+         ["<b>Return to service (manager)</b>", "Manager or Admin", "Knife is Damaged — clears the damage note and photo."],
          ["Retire (out of service)", "Admin / QA", "Any knife not already retired. Use for lost or broken knives."],
          ["Restore to fleet", "Admin / QA", "Knife is out of service."],
-         ["Change knife type (FC / NFC)", "Admin / QA", "Always — changes future due dates. Logged."],
+         ["Change knife type (FC / NFC)", "Admin / QA", "Always — changes future due dates. Logged. <i>Not available to managers.</i>"],
          ["View full history", "Admin / QA", "Opens that knife's complete lifecycle record."]],
         [2.0 * inch, 1.45 * inch, W - 3.45 * inch]))
     s.append(Spacer(1, 10))
@@ -470,9 +471,21 @@ def build():
 
     # ---------------- 10. Advanced ----------------
     s.append(section("10. Advanced: every admin setting and what it does", P(
-        "The Admin panel is at <b>/admin</b>, open to admins and QA. If you are already "
-        "signed in on the fleet board, no second PIN is needed. The header has a "
+        "The Admin panel is at <b>/admin</b>, open to admins, QA, and managers. If you are "
+        "already signed in on the fleet board, no second PIN is needed. The header has a "
         "<b>light/dark mode</b> toggle and a link back to the fleet.")))
+    s.append(callout(
+        "What a manager sees here",
+        "A manager opens the same page but in <b>view-only</b> mode: the <b>Knife fleet</b> "
+        "list and the <b>audit log</b> (with its CSV export). Add a knife, Workers, and "
+        "Advanced are hidden, and knives have no Edit or Remove buttons. Everything below in "
+        "this section is therefore <b>admin/QA only</b>. Managers still perform every floor "
+        "action from the fleet board and the kiosk.", BLUE))
+    s.append(Spacer(1, 10))
+    s.append(figure("admin-manager",
+                    "The admin page as a manager sees it: the knife fleet (view-only) and the "
+                    "audit log — no Add a knife, Workers, or Advanced.",
+                    max_w=6.2 * inch, max_h=3.6 * inch))
 
     s.append(P("Knives", "h2"))
     s.append(table(

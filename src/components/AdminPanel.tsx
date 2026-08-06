@@ -19,7 +19,7 @@ import {
 import { STATUS_META, TYPE_META, normalizeType, type DisplayState } from "@/lib/status";
 import type { TeamsSettings } from "@/lib/data";
 
-const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "ADMIN"];
+const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "MANAGER", "ADMIN"];
 const TYPES = ["FC", "NFC"] as const;
 const INPUT =
   "w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2";
@@ -29,18 +29,36 @@ type KnifeRow = { id: number; number: string; type: string; status: string };
 type SystemInfo = { timeZone: string; serverTime: string };
 
 export function AdminPanel({
+  canEdit,
   logoDataUrl,
   knives,
   system,
   teamsSettings,
   workers,
 }: {
+  canEdit: boolean;
   logoDataUrl: string | null;
   knives: KnifeRow[];
   system: SystemInfo;
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
+  // Managers get a read-only view: the fleet list (and, below this panel, the
+  // audit log). Adding knives, employees, and settings are admin/QA only.
+  if (!canEdit) {
+    return (
+      <div className="space-y-6">
+        <Card title={`Knife fleet (${knives.length})`}>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+            You have <strong>view-only</strong> access as a manager. You can act on knives from
+            the fleet board; ask an admin to add, edit, or remove knives.
+          </p>
+          <KnifeFleetSection knives={knives} readOnly />
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6 items-start">
@@ -63,7 +81,7 @@ function KnivesCard({ knives }: { knives: KnifeRow[] }) {
   );
 }
 
-function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
+function KnifeFleetSection({ knives, readOnly }: { knives: KnifeRow[]; readOnly?: boolean }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   // Match the number (with or without a leading #), the type (FC/NFC or the
@@ -83,11 +101,16 @@ function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
 
   return (
     <div>
-      <h3 className="font-semibold mb-1">Knife fleet ({knives.length})</h3>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes its
-        history — to take a real knife out of rotation, use <strong>Retire</strong> on the board.
-      </p>
+      {!readOnly && (
+        <>
+          <h3 className="font-semibold mb-1">Knife fleet ({knives.length})</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+            Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes
+            its history — to take a real knife out of rotation, use <strong>Retire</strong> on the
+            board.
+          </p>
+        </>
+      )}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -99,7 +122,7 @@ function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
       {/* Tall list so most of the fleet is visible before scrolling. */}
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-[40rem] overflow-y-auto">
         {visible.map((k) => (
-          <KnifeRowItem key={k.id} knife={k} />
+          <KnifeRowItem key={k.id} knife={k} readOnly={readOnly} />
         ))}
         {visible.length === 0 && (
           <li className="py-4 text-center text-sm text-slate-400">
@@ -164,7 +187,7 @@ function SystemSection({ system }: { system: SystemInfo }) {
   );
 }
 
-function KnifeRowItem({ knife }: { knife: KnifeRow }) {
+function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean }) {
   const { pending, msg, run } = useRun();
   const [editing, setEditing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -236,13 +259,15 @@ function KnifeRowItem({ knife }: { knife: KnifeRow }) {
           </span>
         </div>
         <div className="flex flex-wrap gap-1 justify-end">
+          {readOnly ? null : (
           <button
             onClick={() => setEditing(true)}
             className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
           >
             Edit
           </button>
-          {confirmRemove ? (
+          )}
+          {readOnly ? null : confirmRemove ? (
             <>
               <button
                 onClick={() => run(() => deleteKnife(knife.id), `Knife #${knife.number} removed.`, () => setConfirmRemove(false))}

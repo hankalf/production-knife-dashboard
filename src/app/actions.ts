@@ -11,7 +11,15 @@ import {
   clearAdminGate,
 } from "@/lib/session";
 import { computeDueDate } from "@/lib/schedule";
-import { ROLE, STATUS, hasRole, canAccessAdmin, type Role } from "@/lib/status";
+import {
+  ROLE,
+  STATUS,
+  hasRole,
+  canAccessAdmin,
+  canManageConfig,
+  canReturnDamaged,
+  type Role,
+} from "@/lib/status";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -51,7 +59,7 @@ export async function unlockAdmin(pin: string): Promise<ActionResult> {
   const worker = workers.find((w) => verifyPin(clean, w.pin));
   if (!worker) return fail("PIN not recognized.");
   if (!canAccessAdmin(worker.roles)) {
-    return fail("The admin panel is limited to admins and QA.");
+    return fail("The admin panel is limited to admins, QA, and managers.");
   }
   await setCurrentWorker(worker.id);
   await setAdminGate(worker.id);
@@ -72,14 +80,30 @@ async function requireWorkerWithRole(role: Role): Promise<
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
 
-// Admin panel is open to admins and QA.
+// Admin panel is open to admins, QA, and managers (managers read-only).
 async function requirePanelAccess(): Promise<
   { ok: true; workerId: number; roles: string } | { ok: false; error: string }
 > {
   const worker = await getCurrentWorker();
   if (!worker) return { ok: false, error: "Sign in with your PIN first." };
   if (!canAccessAdmin(worker.roles)) {
-    return { ok: false, error: "The admin panel is limited to admins and QA." };
+    return { ok: false, error: "The admin panel is limited to admins, QA, and managers." };
+  }
+  return { ok: true, workerId: worker.id, roles: worker.roles };
+}
+
+// Changing configuration (knives, employees, settings) is admin/QA only —
+// managers get a read-only admin panel.
+async function requireConfigAccess(): Promise<
+  { ok: true; workerId: number; roles: string } | { ok: false; error: string }
+> {
+  const worker = await getCurrentWorker();
+  if (!worker) return { ok: false, error: "Sign in with your PIN first." };
+  if (!canManageConfig(worker.roles)) {
+    return {
+      ok: false,
+      error: "Managers have read-only access — ask an admin to make this change.",
+    };
   }
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
@@ -228,7 +252,7 @@ async function writeKioskLocked(locked: boolean): Promise<void> {
 
 // From the Admin panel (signed-in admin).
 export async function setKioskLocked(locked: boolean): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   await writeKioskLocked(locked);
   return ok();
@@ -408,8 +432,12 @@ export async function kioskClean(
 
 // Manager (admin) returns a damaged knife to service after review.
 export async function returnDamagedToService(knifeId: number): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(ROLE.ADMIN);
-  if (!auth.ok) return fail(auth.error);
+  const worker = await getCurrentWorker();
+  if (!worker) return fail("Sign in with your PIN first.");
+  if (!canReturnDamaged(worker.roles)) {
+    return fail("Only a manager or admin can return a damaged knife to service.");
+  }
+  const auth = { ok: true as const, workerId: worker.id, roles: worker.roles };
   return applyTransition(
     knifeId,
     {
@@ -419,7 +447,8 @@ export async function returnDamagedToService(knifeId: number): Promise<ActionRes
       role: ROLE.ADMIN,
       data: { damageNote: null, damagePhoto: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
     },
-    { workerId: auth.workerId, roles: auth.roles }
+    { workerId: auth.workerId, roles: auth.roles },
+    true // already authorized above (manager or admin)
   );
 }
 
@@ -539,7 +568,7 @@ export async function restoreKnife(knifeId: number): Promise<ActionResult> {
 // ---- Admin: fleet & workers ----------------------------------------------
 
 export async function addKnife(number: string, type: string = "FC"): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const label = (number || "").trim();
   if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
@@ -573,7 +602,7 @@ export async function addKnife(number: string, type: string = "FC"): Promise<Act
 }
 
 export async function setKnifeType(knifeId: number, type: string): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const knifeType = type === "NFC" ? "NFC" : "FC";
   try {
@@ -605,7 +634,7 @@ export async function updateKnifeDetails(
   knifeId: number,
   input: { number: string; type: string }
 ): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const label = (input.number || "").trim();
   if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
@@ -646,7 +675,7 @@ export async function updateKnifeDetails(
 // Permanently delete a knife and its audit history. For mis-added knives;
 // use Retire to take a real knife out of service while keeping its history.
 export async function deleteKnife(knifeId: number): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   try {
     const knife = await prisma.knife.findUnique({ where: { id: knifeId } });
@@ -670,7 +699,7 @@ export async function addWorker(
   pin: string,
   roles: string[]
 ): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const cleanName = (name || "").trim();
   const cleanPin = (pin || "").trim();
@@ -707,7 +736,7 @@ export async function setWorkerActive(
   workerId: number,
   active: boolean
 ): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
   if (!target) return fail("Worker not found.");
@@ -723,7 +752,7 @@ export async function updateWorker(
   workerId: number,
   input: { name: string; roles: string[]; pin?: string }
 ): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
 
   const cleanName = (input.name || "").trim();
@@ -761,7 +790,7 @@ export async function updateWorker(
 }
 
 export async function deleteWorker(workerId: number): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
 
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
@@ -899,7 +928,7 @@ export async function updateTeamsSettings(input: {
   notifyCheckin: boolean;
   notifyCleaned: boolean;
 }): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const url = (input.webhookUrl || "").trim();
   if (input.enabled) {
@@ -934,7 +963,7 @@ export async function updateTeamsSettings(input: {
 
 // Send a test message so an admin can confirm the webhook works.
 export async function sendTeamsTest(): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const cfg = await getTeamsConfig();
   if (!cfg.webhookUrl) return fail("Add a webhook URL first.");
@@ -947,7 +976,7 @@ export async function sendTeamsTest(): Promise<ActionResult> {
 // Save (or clear) the company logo shown in the kiosk's top-left corner.
 // The logo is stored as a data: URL. Pass an empty string to remove it.
 export async function updateLogo(dataUrl: string): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   const value = (dataUrl || "").trim();
   if (value) {
@@ -973,7 +1002,7 @@ export type BulkResult = { ok: boolean; added: number; skipped: number; errors: 
 // Parse a CSV of "name,pin,roles" (roles separated by ; | or space) and create
 // the workers. Header row optional. Existing/duplicate PINs are skipped.
 export async function bulkAddWorkers(csv: string): Promise<BulkResult> {
-  const auth = await requirePanelAccess();
+  const auth = await requireConfigAccess();
   if (!auth.ok) return { ok: false, added: 0, skipped: 0, errors: [auth.error] };
 
   const lines = (csv || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
