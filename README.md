@@ -42,11 +42,12 @@ Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**. The type driv
 - **FC** — checked out and returned the **same day**, due by end of shift (end of today).
 - **NFC** — signed out for the week (Mon–Fri), **due end of Friday**.
 
-On the kiosk the whole number bubble is **blue for FC** and **silver for NFC**, with a large
-centered type badge; a small corner dot still shows lifecycle status and an overdue knife
-gets a red ring. On the management board the type shows as a corner badge. Set the type when
-adding a knife, or change it later from the knife's action modal (admin/QA). New knives
-default to FC.
+On **both** the kiosk and the management board a tile is **filled by type** — blue for FC,
+silver for NFC, with the type spelled out — and **ringed by status**: green available, yellow
+checked out, orange awaiting sanitation, red damaged, red + "OVERDUE" when past due. A
+checked-out tile also shows **who has it** (first name + last initial) and **when it's due
+back**. Set the type when adding a knife, or change it later from the knife's action modal
+(admin/QA). New knives default to FC.
 
 > Due dates use the **server's local time** — set the `TZ` environment variable (e.g.
 > `TZ=America/New_York` for Eastern) so "end of day/Friday" matches the plant's timezone. The active
@@ -144,6 +145,7 @@ To run the whole app in containers instead, use the **`claude/docker-desktop`** 
 - `npm run db:reset` — drop, re-migrate, and re-seed the database
 - `npm run db:backup` — gzip a `pg_dump` of the database to `./backups/`
 - `npm run test:e2e` — run the Playwright end-to-end suite
+- `python3 docs/build_sop.py` — regenerate the SOP PDF (`docs/Safety-Knife-Checkout-SOP.pdf`)
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
 
