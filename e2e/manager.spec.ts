@@ -74,3 +74,33 @@ test("a manager can run floor actions and clear a damaged knife", async ({ page 
 
   await resetKnife(N);
 });
+
+test("QA manages knives but not employees or Teams, and can clear damage", async ({ page }) => {
+  const N = "7";
+  await resetKnife(N);
+  await prisma.knife.updateMany({
+    where: { number: N },
+    data: { status: "DAMAGED", damageNote: "Chipped tip" },
+  });
+
+  await signIn(page, PIN.qa);
+
+  // QA now reviews damaged knives.
+  await boardTile(page, N).click();
+  await page.getByRole("button", { name: /Return to service/ }).click();
+  await expect
+    .poll(async () => (await prisma.knife.findFirst({ where: { number: N } }))?.status)
+    .toBe("AVAILABLE");
+
+  await page.goto("/admin");
+  // Knives stay editable for QA…
+  await expect(page.getByRole("heading", { name: "Knives" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit" }).first()).toBeVisible();
+  // …but employees and Teams settings are admin-only.
+  await expect(page.getByRole("heading", { name: "Workers" })).toHaveCount(0);
+  await page.getByText("Advanced", { exact: true }).click();
+  await expect(page.getByText("Microsoft Teams notifications")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Kiosk logo" })).toBeVisible();
+
+  await resetKnife(N);
+});

@@ -30,6 +30,8 @@ type SystemInfo = { timeZone: string; serverTime: string };
 
 export function AdminPanel({
   canEdit,
+  canManageWorkers,
+  canManageTeams,
   logoDataUrl,
   knives,
   system,
@@ -37,6 +39,8 @@ export function AdminPanel({
   workers,
 }: {
   canEdit: boolean;
+  canManageWorkers: boolean;
+  canManageTeams: boolean;
   logoDataUrl: string | null;
   knives: KnifeRow[];
   system: SystemInfo;
@@ -61,11 +65,16 @@ export function AdminPanel({
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6 items-start">
+      <div className={canManageWorkers ? "grid md:grid-cols-2 gap-6 items-start" : ""}>
         <KnivesCard knives={knives} />
-        <WorkersAndAddCard workers={workers} />
+        {canManageWorkers && <WorkersAndAddCard workers={workers} />}
       </div>
-      <AdvancedCard logoDataUrl={logoDataUrl} system={system} teamsSettings={teamsSettings} />
+      <AdvancedCard
+        logoDataUrl={logoDataUrl}
+        system={system}
+        teamsSettings={teamsSettings}
+        canManageTeams={canManageTeams}
+      />
     </div>
   );
 }
@@ -140,23 +149,29 @@ function AdvancedCard({
   logoDataUrl,
   system,
   teamsSettings,
+  canManageTeams,
 }: {
   logoDataUrl: string | null;
   system: SystemInfo;
   teamsSettings: TeamsSettings;
+  canManageTeams: boolean;
 }) {
   return (
     <details className="group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
       <summary className="cursor-pointer select-none list-none p-5 flex items-center justify-between">
         <span className="text-lg font-semibold">Advanced</span>
         <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          Teams notifications · kiosk logo · system
+          {canManageTeams ? "Teams notifications · kiosk logo · system" : "kiosk logo · system"}
           <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
         </span>
       </summary>
       <div className="px-5 pb-5">
-        <TeamsSection settings={teamsSettings} />
-        <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+        {canManageTeams && (
+          <>
+            <TeamsSection settings={teamsSettings} />
+            <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+          </>
+        )}
         <LogoSection logoDataUrl={logoDataUrl} />
         <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
         <SystemSection system={system} />

@@ -356,7 +356,7 @@ function KnifeModal({
   const has = (r: string) => roles.includes(r);
   // Managers review damaged knives; changing a knife's type is an edit, so it
   // stays with admins and QA.
-  const canReview = has("ADMIN") || has("MANAGER");
+  const canReview = has("ADMIN") || has("MANAGER") || has("QA");
 
   return (
     <div
@@ -477,7 +477,7 @@ function KnifeModal({
             )}
             {is === "DAMAGED" && !canReview && (
               <p className="text-xs text-slate-500">
-                Only a manager or admin can return a damaged knife to service.
+                Only QA, a manager, or an admin can return a damaged knife to service.
               </p>
             )}
 

@@ -162,9 +162,31 @@ export function canAccessAdmin(roles: string): boolean {
   );
 }
 
-// Who may CHANGE configuration — add/edit/remove knives, manage employees,
-// and edit the advanced settings. Managers get a read-only admin panel.
+// Who may change anything at all in the admin panel. Managers may not, so they
+// get the read-only view; the finer-grained checks below apply on top.
 export function canManageConfig(roles: string): boolean {
+  const parsed = parseRoles(roles);
+  return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.QA);
+}
+
+// Knives: add, edit, remove, and change type.
+export function canManageKnives(roles: string): boolean {
+  const parsed = parseRoles(roles);
+  return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.QA);
+}
+
+// Employees: add, edit, deactivate, remove, bulk upload. Admin only.
+export function canManageWorkers(roles: string): boolean {
+  return parseRoles(roles).includes(ROLE.ADMIN);
+}
+
+// Teams notification settings. Admin only.
+export function canManageTeams(roles: string): boolean {
+  return parseRoles(roles).includes(ROLE.ADMIN);
+}
+
+// Kiosk logo and the read-only system readout.
+export function canManageBranding(roles: string): boolean {
   const parsed = parseRoles(roles);
   return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.QA);
 }
@@ -172,7 +194,11 @@ export function canManageConfig(roles: string): boolean {
 // Who may put a DAMAGED knife back into service after reviewing it.
 export function canReturnDamaged(roles: string): boolean {
   const parsed = parseRoles(roles);
-  return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.MANAGER);
+  return (
+    parsed.includes(ROLE.ADMIN) ||
+    parsed.includes(ROLE.MANAGER) ||
+    parsed.includes(ROLE.QA)
+  );
 }
 
 // The capabilities a worker effectively has — admins get every function.

@@ -298,9 +298,9 @@ def build():
         [["Role", "Can do"],
          ["Operator", "Check out an available knife; check in the knife <b>they</b> checked out."],
          ["Sanitation", "Clean and inspect used knives, returning good ones to service or flagging damage."],
-         ["QA", "Everything a supervisor needs: the fleet board, reports, and the full admin panel."],
+         ["QA", "The fleet board, reports, and the admin panel — manages <b>knives</b> and reviews <b>damaged</b> knives, but does not manage employees or Teams settings."],
          ["<b>Manager</b>", "A floor supervisor. Does <b>every</b> operator, sanitation, and QA job, reviews <b>damaged</b> knives, and can <b>view</b> the knife fleet and audit log — but <b>cannot change anything</b> in the admin panel (see section 10)."],
-         ["Admin", "Everything, including adding knives, managing employees, and configuring the system."]],
+         ["Admin", "Everything, including managing <b>employees</b> and the <b>Teams notification</b> settings."]],
         [1.25 * inch, W - 1.25 * inch]))
     s.append(Spacer(1, 10))
     s.append(callout(
@@ -436,7 +436,7 @@ def build():
         [["Action", "Who", "When it appears"],
          ["Check out / Return (mark used)", "Operator (admins included)", "Same lifecycle actions as the kiosk."],
          ["Clean &amp; return to service", "Sanitation (admins included)", "Knife is awaiting sanitation."],
-         ["<b>Return to service (manager)</b>", "Manager or Admin", "Knife is Damaged — clears the damage note and photo."],
+         ["<b>Return to service (manager)</b>", "QA, Manager, or Admin", "Knife is Damaged — clears the damage note and photo."],
          ["Retire (out of service)", "Admin / QA", "Any knife not already retired. Use for lost or broken knives."],
          ["Restore to fleet", "Admin / QA", "Knife is out of service."],
          ["Change knife type (FC / NFC)", "Admin / QA", "Always — changes future due dates. Logged. <i>Not available to managers.</i>"],
@@ -481,6 +481,12 @@ def build():
         "Advanced are hidden, and knives have no Edit or Remove buttons. Everything below in "
         "this section is therefore <b>admin/QA only</b>. Managers still perform every floor "
         "action from the fleet board and the kiosk.", BLUE))
+    s.append(Spacer(1, 8))
+    s.append(callout(
+        "What QA sees here",
+        "QA manages <b>knives</b> (add, edit, remove, change type), the <b>kiosk logo</b>, and "
+        "the <b>audit log</b>, and can return damaged knives to service. <b>Workers</b> and the "
+        "<b>Teams notification</b> settings are hidden — those are admin only.", BLUE))
     s.append(Spacer(1, 10))
     s.append(figure("admin-manager",
                     "The admin page as a manager sees it: the knife fleet (view-only) and the "
@@ -499,7 +505,7 @@ def build():
     s.append(Spacer(1, 10))
     s.append(figure("admin-knives", "Admin - Knives.", max_w=4.2 * inch, max_h=3.6 * inch))
 
-    s.append(P("Workers", "h2"))
+    s.append(P("Workers &mdash; admin only", "h2"))
     s.append(table(
         [["Setting", "What it does"],
          ["<b>Add a worker</b>", "Creates an employee: name, PIN (4–8 digits, must be unique), and one or more roles."],
@@ -519,7 +525,7 @@ def build():
     s.append(P(
         "Click <b>Advanced</b> to expand. These are setup settings — you should rarely "
         "need to change them day to day."))
-    s.append(P("<b>Microsoft Teams notifications</b>", "body"))
+    s.append(P("<b>Microsoft Teams notifications</b> &mdash; admin only", "body"))
     s.append(table(
         [["Setting", "What it does"],
          ["<b>Webhook URL</b>", "Where alerts are posted. Create it in Teams: channel &gt; <b>“...” menu</b> &gt; <b>Workflows</b> → “Post to a channel when a webhook request is received”, then paste the URL it generates (it contains <i>logic.azure.com</i>). Older “Incoming Webhook” connector URLs also work."],
