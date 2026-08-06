@@ -25,12 +25,12 @@ function stateOf(k: KioskKnife, now: number): DisplayState {
   return k.status as DisplayState;
 }
 
-// Kiosk tiles are colored by knife TYPE: blue for Food Contact, silver for
-// Non-Food Contact. (Status is shown by the corner dot + the counts above.)
+// Kiosk tiles are filled by knife TYPE: blue for Food Contact, silver for
+// Non-Food Contact. (Status is shown by the colored ring around the tile.)
 function typeTile(type: string): string {
   return normalizeType(type) === "NFC"
-    ? "bg-slate-300 text-slate-900 border-slate-400"
-    : "bg-blue-600 text-white border-blue-700";
+    ? "bg-slate-300 text-slate-900"
+    : "bg-blue-600 text-white";
 }
 
 // Compact holder label for the small kiosk tile: "First L." Parentheticals
@@ -201,9 +201,9 @@ export default function KioskBoard({
             <button
               key={k.id}
               onClick={() => !locked && setSelectedId(k.id)}
-              className={`relative min-h-0 rounded-lg lg:rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
+              className={`relative min-h-0 rounded-lg lg:rounded-xl border-[3px] lg:border-4 flex flex-col items-center justify-center gap-0.5 font-bold transition ${typeTile(
                 k.type
-              )} ${state === "OVERDUE" ? "ring-2 lg:ring-4 ring-red-500" : ""} ${locked ? "cursor-default" : ""}`}
+              )} ${STATUS_META[state].ring} ${locked ? "cursor-default" : ""}`}
               title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
               <span className="leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}>
@@ -224,8 +224,6 @@ export default function KioskBoard({
                   {shortName(k.holderName)}
                 </span>
             )}
-              {/* status dot */}
-              <span className={`absolute top-0.5 right-0.5 lg:top-1 lg:right-1 w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 rounded-full ring-1 ring-black/20 ${STATUS_META[state].dot}`} />
             </button>
           ))}
         </div>
