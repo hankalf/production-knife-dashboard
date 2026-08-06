@@ -578,16 +578,53 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
   );
 }
 
+// Group order for the employee list and export: Admin → QA → Operator → Sanitation.
+const ROLE_ORDER = ["ADMIN", "QA", "OPERATOR", "SANITATION"];
+function rolePriority(roles: string): number {
+  const set = roles.split(",").map((r) => r.trim());
+  const i = ROLE_ORDER.findIndex((r) => set.includes(r));
+  return i === -1 ? ROLE_ORDER.length : i;
+}
+
 function EmployeesSection({ workers }: { workers: WorkerRow[] }) {
+  const sorted = [...workers].sort(
+    (a, b) => rolePriority(a.roles) - rolePriority(b.roles) || a.name.localeCompare(b.name)
+  );
+
+  function exportCsv() {
+    const rows = [
+      "name,roles,active",
+      ...sorted.map(
+        (w) => `"${w.name.replace(/"/g, '""')}","${w.roles}",${w.active ? "yes" : "no"}`
+      ),
+    ];
+    const blob = new Blob([rows.join("\n") + "\n"], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "employees.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
-      <h3 className="font-semibold mb-1">Employees ({workers.length})</h3>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold">Employees ({workers.length})</h3>
+        <button
+          type="button"
+          onClick={exportCsv}
+          className="text-sm rounded-lg px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200"
+        >
+          Export employees (CSV)
+        </button>
+      </div>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        Edit an employee&apos;s name, roles, or PIN; deactivate to revoke access while keeping
-        their history; remove to delete entirely.
+        Sorted by role: Admin, QA, Operator, Sanitation. Edit an employee&apos;s name, roles, or
+        PIN; deactivate to revoke access while keeping their history; remove to delete entirely.
       </p>
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
-        {workers.map((w) => (
+        {sorted.map((w) => (
           <EmployeeRow key={w.id} worker={w} />
         ))}
       </ul>

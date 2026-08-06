@@ -166,6 +166,20 @@ export default function KioskBoard({
         </p>
       )}
 
+      {/* Return policy per knife type */}
+      <p className="text-xs lg:text-sm mb-2 flex flex-wrap gap-x-5 gap-y-0.5">
+        <span>
+          <span className="font-semibold text-blue-400">Food Contact:</span>{" "}
+          <span className="text-slate-300">return same day by end of shift</span>{" "}
+          <span className="text-slate-500">· devolver el mismo día al final del turno</span>
+        </span>
+        <span>
+          <span className="font-semibold text-slate-300">Non-Food Contact:</span>{" "}
+          <span className="text-slate-300">out for the week — due Friday end of shift</span>{" "}
+          <span className="text-slate-500">· vence el viernes al final del turno</span>
+        </span>
+      </p>
+
       {overdue.length > 0 && (
         <div className="mb-2 rounded-lg bg-red-950 border border-red-700 px-3 py-2 text-red-200 text-base lg:text-lg font-semibold flex items-center gap-2">
           <span aria-hidden>⚠️</span>
@@ -246,6 +260,7 @@ function KioskModal({
   const [step, setStep] = useState<"pin" | "confirm" | "checklist">("pin");
   const [pin, setPin] = useState("");
   const [workerName, setWorkerName] = useState<string | null>(null);
+  const [dueAtMs, setDueAtMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const act = kioskActionFor(knife.status);
@@ -257,6 +272,7 @@ function KioskModal({
       const res = await kioskIdentify(knife.id, act.action, pin);
       if (res.ok) {
         setWorkerName(res.name);
+        setDueAtMs(res.dueAtMs ?? null);
         setStep("confirm");
       } else {
         setError(res.error);
@@ -374,6 +390,22 @@ function KioskModal({
               <div className="text-2xl font-bold">{workerName}</div>
               <div className="text-sm text-slate-600 mt-2">{act.label} — knife #{knife.number}</div>
             </div>
+            {act.action === "CHECKOUT" && dueAtMs && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 mb-4 text-center text-amber-900">
+                <div className="text-xs uppercase tracking-wide font-semibold mb-0.5">
+                  Due back · Fecha de devolución
+                </div>
+                <div className="text-lg font-bold">
+                  {new Date(dueAtMs).toLocaleString([], {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </div>
+              </div>
+            )}
             {error && <p className="text-center text-sm text-red-600 mb-3" role="alert">{error}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button onClick={notMe} disabled={pending} className="h-14 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold disabled:opacity-50">
