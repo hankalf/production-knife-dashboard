@@ -250,6 +250,30 @@ export async function setKioskLockedWithPin(
 
 // Kiosk operator actions: check out / check in. (Sanitation cleaning goes
 // through kioskClean below because it carries the inspection checklist.)
+// Post a live Teams alert for a kiosk action, if that alert type is enabled.
+async function notifyKioskAction(
+  knifeId: number,
+  workerId: number,
+  kind: "checkout" | "checkin" | "cleaned"
+): Promise<void> {
+  const cfg = await getTeamsConfig();
+  const wanted =
+    kind === "checkout" ? cfg.notifyCheckout : kind === "checkin" ? cfg.notifyCheckin : cfg.notifyCleaned;
+  if (!cfg.enabled || !wanted || !cfg.webhookUrl) return;
+  const [knife, worker] = await Promise.all([
+    prisma.knife.findUnique({ where: { id: knifeId }, select: { number: true, dueAt: true } }),
+    prisma.worker.findUnique({ where: { id: workerId }, select: { name: true } }),
+  ]);
+  const who = worker?.name ?? "Someone";
+  const text =
+    kind === "checkout"
+      ? `🔪 Knife #${knife?.number} checked out by ${who}${knife?.dueAt ? ` — due back ${knife.dueAt.toLocaleString()}` : ""}.`
+      : kind === "checkin"
+        ? `↩️ Knife #${knife?.number} checked in by ${who} — awaiting sanitation.`
+        : `✅ Knife #${knife?.number} cleaned & returned to service by ${who}.`;
+  await postToTeams(cfg.webhookUrl, text);
+}
+
 export async function kioskAct(
   knifeId: number,
   action: "CHECKOUT" | "RETURN",
@@ -266,7 +290,7 @@ export async function kioskAct(
     if (!knife) return fail("Knife not found.");
     const now = new Date();
     const due = computeDueDate(knife.type, now);
-    return applyTransition(
+    const res = await applyTransition(
       knifeId,
       {
         action: "CHECKOUT",
@@ -278,9 +302,11 @@ export async function kioskAct(
       },
       actor
     );
+    if (res.ok) await notifyKioskAction(knifeId, actor.workerId, "checkout");
+    return res;
   }
   // RETURN
-  return applyTransition(
+  const res = await applyTransition(
     knifeId,
     {
       action: "RETURN",
@@ -296,6 +322,8 @@ export async function kioskAct(
     },
     actor
   );
+  if (res.ok) await notifyKioskAction(knifeId, actor.workerId, "checkin");
+  return res;
 }
 
 export type CleanAnswers = {
@@ -362,7 +390,7 @@ export async function kioskClean(
   if (!answers.cleaned || !answers.inspected) {
     return fail("Knife must be marked cleaned and inspected before returning to service.");
   }
-  return applyTransition(
+  const cleanRes = await applyTransition(
     knifeId,
     {
       action: "CLEAN",
@@ -374,6 +402,8 @@ export async function kioskClean(
     },
     actor
   );
+  if (cleanRes.ok) await notifyKioskAction(knifeId, actor.workerId, "cleaned");
+  return cleanRes;
 }
 
 // Manager (admin) returns a damaged knife to service after review.
@@ -834,7 +864,19 @@ async function postToTeams(webhookUrl: string, text: string): Promise<string | n
 
 async function getTeamsConfig() {
   const rows = await prisma.setting.findMany({
-    where: { key: { in: ["teams.enabled", "teams.webhookUrl", "teams.notifyDamaged", "teams.notifyOverdue"] } },
+    where: {
+      key: {
+        in: [
+          "teams.enabled",
+          "teams.webhookUrl",
+          "teams.notifyDamaged",
+          "teams.notifyOverdue",
+          "teams.notifyCheckout",
+          "teams.notifyCheckin",
+          "teams.notifyCleaned",
+        ],
+      },
+    },
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
@@ -842,6 +884,9 @@ async function getTeamsConfig() {
     webhookUrl: map.get("teams.webhookUrl") ?? "",
     notifyDamaged: (map.get("teams.notifyDamaged") ?? "true") === "true",
     notifyOverdue: (map.get("teams.notifyOverdue") ?? "true") === "true",
+    notifyCheckout: map.get("teams.notifyCheckout") === "true",
+    notifyCheckin: map.get("teams.notifyCheckin") === "true",
+    notifyCleaned: map.get("teams.notifyCleaned") === "true",
   };
 }
 
@@ -850,6 +895,9 @@ export async function updateTeamsSettings(input: {
   webhookUrl: string;
   notifyDamaged: boolean;
   notifyOverdue: boolean;
+  notifyCheckout: boolean;
+  notifyCheckin: boolean;
+  notifyCleaned: boolean;
 }): Promise<ActionResult> {
   const auth = await requirePanelAccess();
   if (!auth.ok) return fail(auth.error);
@@ -858,7 +906,13 @@ export async function updateTeamsSettings(input: {
     if (!/^https:\/\/\S+$/.test(url)) return fail("Enter a valid https Teams webhook URL.");
     const problem = teamsUrlProblem(url);
     if (problem) return fail(problem);
-    if (!input.notifyDamaged && !input.notifyOverdue) {
+    if (
+      !input.notifyDamaged &&
+      !input.notifyOverdue &&
+      !input.notifyCheckout &&
+      !input.notifyCheckin &&
+      !input.notifyCleaned
+    ) {
       return fail("Choose at least one thing to be notified about.");
     }
   }
@@ -867,6 +921,9 @@ export async function updateTeamsSettings(input: {
     ["teams.webhookUrl", url],
     ["teams.notifyDamaged", String(input.notifyDamaged)],
     ["teams.notifyOverdue", String(input.notifyOverdue)],
+    ["teams.notifyCheckout", String(input.notifyCheckout)],
+    ["teams.notifyCheckin", String(input.notifyCheckin)],
+    ["teams.notifyCleaned", String(input.notifyCleaned)],
   ];
   for (const [key, value] of entries) {
     await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });

@@ -5,6 +5,9 @@ export type TeamsSettings = {
   webhookUrl: string;
   notifyDamaged: boolean;
   notifyOverdue: boolean;
+  notifyCheckout: boolean;
+  notifyCheckin: boolean;
+  notifyCleaned: boolean;
 };
 
 const TEAMS_KEYS = [
@@ -12,6 +15,9 @@ const TEAMS_KEYS = [
   "teams.webhookUrl",
   "teams.notifyDamaged",
   "teams.notifyOverdue",
+  "teams.notifyCheckout",
+  "teams.notifyCheckin",
+  "teams.notifyCleaned",
 ] as const;
 
 export async function getTeamsSettings(): Promise<TeamsSettings> {
@@ -22,6 +28,10 @@ export async function getTeamsSettings(): Promise<TeamsSettings> {
     webhookUrl: map.get("teams.webhookUrl") ?? "",
     notifyDamaged: (map.get("teams.notifyDamaged") ?? "true") === "true",
     notifyOverdue: (map.get("teams.notifyOverdue") ?? "true") === "true",
+    // Per-action alerts are off by default — they're chatty on a busy floor.
+    notifyCheckout: map.get("teams.notifyCheckout") === "true",
+    notifyCheckin: map.get("teams.notifyCheckin") === "true",
+    notifyCleaned: map.get("teams.notifyCleaned") === "true",
   };
 }
 
