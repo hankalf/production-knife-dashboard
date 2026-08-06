@@ -43,7 +43,7 @@ export function AdminPanel({
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6 items-start">
         <KnivesCard knives={knives} />
         <WorkersAndAddCard workers={workers} />
       </div>
@@ -96,7 +96,8 @@ function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
         aria-label="Search knives"
         className={`${INPUT} mb-2`}
       />
-      <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
+      {/* Tall list so most of the fleet is visible before scrolling. */}
+      <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-[40rem] overflow-y-auto">
         {visible.map((k) => (
           <KnifeRowItem key={k.id} knife={k} />
         ))}
@@ -553,6 +554,9 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
   const [notifyDamaged, setNotifyDamaged] = useState(settings.notifyDamaged);
   const [notifyOverdue, setNotifyOverdue] = useState(settings.notifyOverdue);
+  const [notifyCheckout, setNotifyCheckout] = useState(settings.notifyCheckout);
+  const [notifyCheckin, setNotifyCheckin] = useState(settings.notifyCheckin);
+  const [notifyCleaned, setNotifyCleaned] = useState(settings.notifyCleaned);
 
   return (
     <div>
@@ -585,17 +589,41 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
           <input type="checkbox" checked={notifyDamaged} onChange={(e) => setNotifyDamaged(e.target.checked)} className="w-5 h-5" />
           <span>A knife is flagged damaged (needs a manager) — live</span>
         </label>
-        <label className="flex items-center gap-3">
+        <label className="flex items-center gap-3 mb-2">
           <input type="checkbox" checked={notifyOverdue} onChange={(e) => setNotifyOverdue(e.target.checked)} className="w-5 h-5" />
           <span>A knife goes overdue (requires a scheduled job)</span>
         </label>
+        <label className="flex items-center gap-3 mb-2">
+          <input type="checkbox" checked={notifyCheckout} onChange={(e) => setNotifyCheckout(e.target.checked)} className="w-5 h-5" />
+          <span>A knife is checked out (with its due-back time) — live</span>
+        </label>
+        <label className="flex items-center gap-3 mb-2">
+          <input type="checkbox" checked={notifyCheckin} onChange={(e) => setNotifyCheckin(e.target.checked)} className="w-5 h-5" />
+          <span>A knife is checked in — live</span>
+        </label>
+        <label className="flex items-center gap-3">
+          <input type="checkbox" checked={notifyCleaned} onChange={(e) => setNotifyCleaned(e.target.checked)} className="w-5 h-5" />
+          <span>A knife is cleaned &amp; returned to service — live</span>
+        </label>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+          Per-action alerts can be chatty on a busy floor — they are off by default.
+        </p>
       </fieldset>
 
       <div className="flex gap-2">
         <button
           onClick={() =>
             run(
-              () => updateTeamsSettings({ enabled, webhookUrl, notifyDamaged, notifyOverdue }),
+              () =>
+                updateTeamsSettings({
+                  enabled,
+                  webhookUrl,
+                  notifyDamaged,
+                  notifyOverdue,
+                  notifyCheckout,
+                  notifyCheckin,
+                  notifyCleaned,
+                }),
               "Teams settings saved."
             )
           }

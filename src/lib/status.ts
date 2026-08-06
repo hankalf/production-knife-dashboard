@@ -78,7 +78,8 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
     label: "Overdue",
     tile: "bg-red-600 hover:bg-red-700 text-white border-red-700 animate-pulse",
     dot: "bg-red-600",
-    ring: "border-red-500 animate-pulse",
+    // No animate-pulse here: it fades the whole tile and hurts legibility.
+    ring: "border-red-500",
   },
   DIRTY: {
     label: "Awaiting sanitation",

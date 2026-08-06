@@ -70,6 +70,18 @@ async function downscalePhoto(file: File, maxDim = 1024, quality = 0.7): Promise
   return canvas.toDataURL("image/jpeg", quality);
 }
 
+// Compact due label for the tile: same-day shows just the time, another day
+// shows the weekday too. An overdue knife says so outright.
+function dueLabel(dueAtMs: number, now: number): string {
+  if (dueAtMs < now) return "OVERDUE";
+  const due = new Date(dueAtMs);
+  const sameDay = new Date(now).toDateString() === due.toDateString();
+  const time = due.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return sameDay
+    ? `Due ${time}`
+    : `Due ${due.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
 type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
 
 function kioskActionFor(status: string): { action: KioskAction; label: string; role: string } | null {
@@ -218,6 +230,19 @@ export default function KioskBoard({
               <span className="leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}>
                 #{k.number}
               </span>
+              {/* when it's due back */}
+              {k.dueAtMs && (k.status === "CHECKED_OUT" || state === "OVERDUE") && (
+                <span
+                  className={`w-full px-0.5 text-center leading-tight ${
+                    state === "OVERDUE"
+                      ? "font-extrabold text-red-100 bg-red-700/80 rounded"
+                      : "font-semibold"
+                  }`}
+                  style={{ fontSize: "clamp(0.42rem, 1.45vmin, 0.8rem)" }}
+                >
+                  {dueLabel(k.dueAtMs, now || Date.now())}
+                </span>
+              )}
               {/* knife type — pinned to the bottom of the card */}
               <span
                 className="absolute inset-x-0 bottom-0 px-0.5 py-0.5 text-center font-bold uppercase tracking-tight leading-[1.05]"
