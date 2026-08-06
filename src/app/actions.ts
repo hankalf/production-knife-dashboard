@@ -187,7 +187,7 @@ export async function kioskIdentify(
   knifeId: number,
   action: KioskAction,
   pin: string
-): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; name: string; dueAtMs?: number } | { ok: false; error: string }> {
   if (await kioskIsLocked()) {
     return { ok: false, error: "The kiosk is locked. Ask a supervisor to unlock it." };
   }
@@ -202,6 +202,15 @@ export async function kioskIdentify(
   const role = ACTION_ROLE[action];
   if (!hasRole(worker.roles, role)) {
     return { ok: false, error: `This action requires the ${role} role.` };
+  }
+
+  // For a checkout, tell the confirm screen when the knife will be due back —
+  // computed server-side so it matches exactly what checkout will stamp.
+  if (action === "CHECKOUT") {
+    const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
+    if (knife) {
+      return { ok: true, name: worker.name, dueAtMs: computeDueDate(knife.type, new Date()).getTime() };
+    }
   }
   return { ok: true, name: worker.name };
 }
