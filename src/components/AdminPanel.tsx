@@ -587,9 +587,16 @@ function rolePriority(roles: string): number {
 }
 
 function EmployeesSection({ workers }: { workers: WorkerRow[] }) {
+  const [query, setQuery] = useState("");
   const sorted = [...workers].sort(
     (a, b) => rolePriority(a.roles) - rolePriority(b.roles) || a.name.localeCompare(b.name)
   );
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? sorted.filter(
+        (w) => w.name.toLowerCase().includes(q) || w.roles.toLowerCase().includes(q)
+      )
+    : sorted;
 
   function exportCsv() {
     const rows = [
@@ -623,10 +630,23 @@ function EmployeesSection({ workers }: { workers: WorkerRow[] }) {
         Sorted by role: Admin, QA, Operator, Sanitation. Edit an employee&apos;s name, roles, or
         PIN; deactivate to revoke access while keeping their history; remove to delete entirely.
       </p>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        type="search"
+        placeholder="Search by name or role…"
+        aria-label="Search employees"
+        className={`${INPUT} mb-2`}
+      />
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
-        {sorted.map((w) => (
+        {visible.map((w) => (
           <EmployeeRow key={w.id} worker={w} />
         ))}
+        {visible.length === 0 && (
+          <li className="py-4 text-center text-sm text-slate-400">
+            No employees match &quot;{query}&quot;.
+          </li>
+        )}
       </ul>
     </div>
   );
