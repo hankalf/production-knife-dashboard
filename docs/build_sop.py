@@ -13,6 +13,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     BaseDocTemplate,
+    Image,
     Frame,
     KeepTogether,
     ListFlowable,
@@ -68,6 +69,8 @@ S = {
     "cellh": ParagraphStyle("cellh", parent=styles["BodyText"], fontSize=9, leading=12.5,
                             spaceAfter=0, fontName="Helvetica-Bold",
                             textColor=colors.white),
+    "caption": ParagraphStyle("caption", parent=styles["BodyText"], fontSize=8.5,
+                              leading=11.5, textColor=SLATE, spaceAfter=0),
     "callout": ParagraphStyle("callout", parent=styles["BodyText"], fontSize=9.5,
                               leading=13.5, spaceAfter=0),
 }
@@ -75,6 +78,64 @@ S = {
 
 def P(text, style="body"):
     return Paragraph(text, S[style])
+
+
+IMG = Path(__file__).resolve().parent / "img"
+
+
+def figure(name, caption, max_w=None, max_h=3.9 * inch):
+    """A screenshot scaled to fit, with a caption, kept on one page."""
+    from reportlab.lib.utils import ImageReader
+    path = IMG / f"{name}.png"
+    iw, ih = ImageReader(str(path)).getSize()
+    max_w = max_w or 6.2 * inch
+    scale = min(max_w / iw, max_h / ih)
+    img = Image(str(path), width=iw * scale, height=ih * scale)
+    img.hAlign = "LEFT"
+    cap = Paragraph(f"<i>{caption}</i>", S["caption"])
+    box = Table([[img], [cap]], colWidths=[iw * scale], hAlign="LEFT")
+    box.setStyle(TableStyle([
+        ("BOX", (0, 0), (0, 0), 0.75, BORDER),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (0, 0), 0),
+        ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+        ("TOPPADDING", (0, 1), (0, 1), 4),
+        ("BOTTOMPADDING", (0, 1), (0, 1), 2),
+    ]))
+    return KeepTogether([box, Spacer(1, 10)])
+
+
+def figure_row(items, each_w=2.85 * inch, max_h=3.5 * inch):
+    """Two screenshots side by side, each with its own caption."""
+    from reportlab.lib.utils import ImageReader
+    cells = []
+    for name, caption in items:
+        path = IMG / f"{name}.png"
+        iw, ih = ImageReader(str(path)).getSize()
+        scale = min(each_w / iw, max_h / ih)
+        img = Image(str(path), width=iw * scale, height=ih * scale)
+        img.hAlign = "LEFT"
+        inner = Table([[img], [Paragraph(f"<i>{caption}</i>", S["caption"])]],
+                      colWidths=[iw * scale], hAlign="LEFT")
+        inner.setStyle(TableStyle([
+            ("BOX", (0, 0), (0, 0), 0.75, BORDER),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (0, 0), 0),
+            ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+            ("TOPPADDING", (0, 1), (0, 1), 4),
+        ]))
+        cells.append(inner)
+    row = Table([cells], colWidths=[each_w + 12] * len(cells), hAlign="LEFT")
+    row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return KeepTogether([row, Spacer(1, 10)])
 
 
 def section(heading, *flowables):
@@ -187,6 +248,10 @@ def build():
         "A knife must never go back into food production without being cleaned and "
         "inspected. The system enforces that order — it is impossible to check out a "
         "knife that has not been cleaned and passed inspection.", BLUE))
+    s.append(Spacer(1, 0.22 * inch))
+    s.append(figure("kiosk-board",
+                    "The kiosk on the shared iPad — what the floor sees all day.",
+                    max_w=6.6 * inch, max_h=3.1 * inch))
 
     s.append(PageBreak())
 
@@ -273,6 +338,10 @@ def build():
         "The screen shows when the knife is <b>due back</b>. The tile now shows your "
         "name at the top and a yellow ring.",
     ])]))
+    s.append(figure_row([
+        ("kiosk-pin", "Step 2 — enter your PIN."),
+        ("kiosk-confirm", "Step 3 — confirm your name, and see the due-back time."),
+    ]))
 
     s.append(KeepTogether([P("Checking a knife in — Operator", "h2"), steps([
         "Tap your knife (yellow ring, your name on it).",
@@ -307,6 +376,11 @@ def build():
          ["Red (rose)", "Damaged — needs manager", "Out of use until a manager reviews it."],
          ["Gray", "Out of service", "Retired from the fleet."]],
         [1.35 * inch, 1.4 * inch, W - 2.75 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure("kiosk-board",
+                    "Knife #2 and #6 are checked out (yellow, due today), #9 is overdue, "
+                    "#4 and #11 await sanitation (orange), #13 is damaged, and #51–#53 are "
+                    "Non-Food Contact (silver).", max_w=6.4 * inch, max_h=3.2 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
         "The counts along the top show how many knives are in each state. If anything "
@@ -324,6 +398,11 @@ def build():
          ["3", "<b>Condition</b> / Condición", "Good / Bueno — or — Damaged / Dañado."],
          ["4", "<b>If damaged, why?</b> / ¿Por qué está dañado?", "Required when Damaged. A <b>photo</b> can be attached with the iPad camera (optional but recommended)."]],
         [0.3 * inch, 2.1 * inch, W - 2.4 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure_row([
+        ("kiosk-checklist", "The checklist as sanitation answers it."),
+        ("kiosk-checklist-damaged", "Damaged reveals the reason box and photo button."),
+    ], max_h=3.7 * inch))
     s.append(Spacer(1, 10))
     s.append(callout(
         "The rule the system enforces",
@@ -343,6 +422,9 @@ def build():
         "<b>Reported damage</b>, view the photo, then either "
         "<b>Return to service (manager)</b> or <b>Retire (out of service)</b>.",
     ]))
+    s.append(figure("board-damaged",
+                    "What the manager sees: the reported reason, the photo, and the two "
+                    "decisions available.", max_w=3.4 * inch, max_h=4.2 * inch))
 
 
     # ---------------- 8. Manager tasks ----------------
@@ -359,6 +441,10 @@ def build():
          ["Change knife type (FC / NFC)", "Admin / QA", "Always — changes future due dates. Logged."],
          ["View full history", "Admin / QA", "Opens that knife's complete lifecycle record."]],
         [2.0 * inch, 1.45 * inch, W - 3.45 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure("board-fleet",
+                    "The fleet board. Filter chips across the top; tap any knife to act on it.",
+                    max_w=6.4 * inch, max_h=3.3 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
         "Use the filter chips above the grid to show only one status. When viewing "
@@ -377,6 +463,9 @@ def build():
          ["End-of-day sweep", "A table of every knife still out — who has it, since when, when it is due, and whether it is overdue. <b>Work this list before shift close.</b>"],
          ["Most-used knives", "Highest-use blades — useful for spotting wear."]],
         [1.5 * inch, W - 1.5 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure("reports", "The Reports page, including the end-of-day sweep.",
+                    max_w=6.0 * inch, max_h=4.0 * inch))
 
 
     # ---------------- 10. Advanced ----------------
@@ -394,6 +483,8 @@ def build():
          ["<b>Edit</b> (per knife)", "Change a knife's number or type. Logged to the audit trail."],
          ["<b>Remove</b> (per knife)", "<b>Permanently deletes</b> the knife and its history. Intended for a knife added by mistake. Blocked while the knife is checked out. To take a real knife out of rotation and <b>keep</b> its history, use <b>Retire</b> on the board instead."]],
         [1.45 * inch, W - 1.45 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure("admin-knives", "Admin - Knives.", max_w=4.2 * inch, max_h=3.6 * inch))
 
     s.append(P("Workers", "h2"))
     s.append(table(
@@ -408,6 +499,8 @@ def build():
          ["<b>Deactivate</b> / Reactivate", "Revokes or restores access <b>while keeping</b> the person's history. Use this when someone leaves."],
          ["<b>Remove</b> (per employee)", "Deletes the employee record entirely. Prefer Deactivate to preserve the audit trail."]],
         [1.45 * inch, W - 1.45 * inch]))
+    s.append(Spacer(1, 10))
+    s.append(figure("admin-workers", "Admin - Workers.", max_w=4.2 * inch, max_h=3.8 * inch))
 
     s.append(P("Advanced section (collapsed by default)", "h2"))
     s.append(P(
@@ -426,6 +519,10 @@ def build():
          ["<b>Save</b>", "Stores the settings. If notifications are enabled, a valid https URL and at least one alert type are required."],
          ["<b>Send test message</b>", "Posts a test line to the channel so you can confirm the connection before relying on it. Errors report exactly what Teams returned."]],
         [1.7 * inch, W - 1.7 * inch]))
+    s.append(Spacer(1, 8))
+    s.append(figure("admin-advanced",
+                    "Admin - Advanced, expanded: Teams notifications, kiosk logo, and system "
+                    "timezone.", max_w=6.0 * inch, max_h=4.2 * inch))
     s.append(Spacer(1, 6))
     s.append(P(
         "<i>Per-action alerts (checkout / check-in / cleaned) get chatty on a busy "
@@ -446,6 +543,11 @@ def build():
          ["<b>Timezone</b>", "The timezone all due dates are calculated in — “end of day” and “end of Friday” follow this clock. Set by the <b>TZ</b> environment variable on the server (e.g. America/New_York). If this is wrong, due times will be wrong."],
          ["<b>Server time now</b>", "The system's current time in that timezone. Compare it against a clock on the wall to confirm the setting is right."]],
         [1.7 * inch, W - 1.7 * inch]))
+    s.append(Spacer(1, 6))
+    s.append(P(
+        "<i>Due times are displayed in the timezone of the device you are looking at. Keep "
+        "the kiosk iPad set to the plant's timezone so what the floor sees matches what the "
+        "server recorded.</i>", "small"))
 
     s.append(Spacer(1, 10))
     s.append(P("<b>Recent activity (audit log)</b>", "body"))
