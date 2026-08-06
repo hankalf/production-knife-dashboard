@@ -64,6 +64,23 @@ function KnivesCard({ knives }: { knives: KnifeRow[] }) {
 }
 
 function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  // Match the number (with or without a leading #), the type (FC/NFC or the
+  // full label), or the status label shown on the row.
+  const visible = q
+    ? knives.filter((k) => {
+        const type = normalizeType(k.type);
+        const statusLabel = STATUS_META[k.status as DisplayState]?.label ?? k.status;
+        return (
+          k.number.includes(q.replace(/^#/, "")) ||
+          type.toLowerCase().includes(q) ||
+          TYPE_META[type].label.toLowerCase().includes(q) ||
+          statusLabel.toLowerCase().includes(q)
+        );
+      })
+    : knives;
+
   return (
     <div>
       <h3 className="font-semibold mb-1">Knife fleet ({knives.length})</h3>
@@ -71,10 +88,23 @@ function KnifeFleetSection({ knives }: { knives: KnifeRow[] }) {
         Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes its
         history — to take a real knife out of rotation, use <strong>Retire</strong> on the board.
       </p>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        type="search"
+        placeholder="Search by number, type, or status…"
+        aria-label="Search knives"
+        className={`${INPUT} mb-2`}
+      />
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto">
-        {knives.map((k) => (
+        {visible.map((k) => (
           <KnifeRowItem key={k.id} knife={k} />
         ))}
+        {visible.length === 0 && (
+          <li className="py-4 text-center text-sm text-slate-400">
+            No knives match &quot;{query}&quot;.
+          </li>
+        )}
       </ul>
     </div>
   );
@@ -92,13 +122,22 @@ function AdvancedCard({
   teamsSettings: TeamsSettings;
 }) {
   return (
-    <Card title="Advanced">
-      <TeamsSection settings={teamsSettings} />
-      <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
-      <LogoSection logoDataUrl={logoDataUrl} />
-      <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
-      <SystemSection system={system} />
-    </Card>
+    <details className="group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <summary className="cursor-pointer select-none list-none p-5 flex items-center justify-between">
+        <span className="text-lg font-semibold">Advanced</span>
+        <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          Teams notifications · kiosk logo · system
+          <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
+        </span>
+      </summary>
+      <div className="px-5 pb-5">
+        <TeamsSection settings={teamsSettings} />
+        <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+        <LogoSection logoDataUrl={logoDataUrl} />
+        <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
+        <SystemSection system={system} />
+      </div>
+    </details>
   );
 }
 

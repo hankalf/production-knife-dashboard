@@ -56,6 +56,8 @@ type StatusMeta = {
   // Tailwind classes for the grid tile and the small legend dot.
   tile: string;
   dot: string;
+  // Border color used as the status ring around kiosk bubbles.
+  ring: string;
 };
 
 export const STATUS_META: Record<DisplayState, StatusMeta> = {
@@ -63,22 +65,26 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
     label: "Available",
     tile: "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-600",
     dot: "bg-emerald-500",
+    ring: "border-emerald-400",
   },
   CHECKED_OUT: {
     label: "Checked out",
     tile: "bg-sky-500 hover:bg-sky-600 text-white border-sky-600",
-    // Bright yellow so the status dot stays visible on the blue/silver kiosk bubbles.
+    // Bright yellow so the status stays visible on the blue/silver kiosk bubbles.
     dot: "bg-yellow-300",
+    ring: "border-yellow-300",
   },
   OVERDUE: {
     label: "Overdue",
     tile: "bg-red-600 hover:bg-red-700 text-white border-red-700 animate-pulse",
     dot: "bg-red-600",
+    ring: "border-red-500 animate-pulse",
   },
   DIRTY: {
     label: "Awaiting sanitation",
     tile: "bg-orange-500 hover:bg-orange-600 text-white border-orange-600",
     dot: "bg-orange-500",
+    ring: "border-orange-500",
   },
   // Legacy state from when a QA-inspection step existed; kept so any knife
   // still in this state renders (sanitation can clean it back to Available).
@@ -86,16 +92,19 @@ export const STATUS_META: Record<DisplayState, StatusMeta> = {
     label: "Cleaned (legacy)",
     tile: "bg-violet-500 hover:bg-violet-600 text-white border-violet-600",
     dot: "bg-violet-500",
+    ring: "border-violet-400",
   },
   DAMAGED: {
     label: "Damaged — needs manager",
     tile: "bg-rose-600 hover:bg-rose-700 text-white border-rose-700",
     dot: "bg-rose-600",
+    ring: "border-rose-500",
   },
   OUT_OF_SERVICE: {
     label: "Out of service",
     tile: "bg-slate-400 hover:bg-slate-500 text-white border-slate-500",
     dot: "bg-slate-400",
+    ring: "border-slate-500",
   },
 };
 
