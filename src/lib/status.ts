@@ -42,6 +42,9 @@ export const ROLE = {
   OPERATOR: "OPERATOR",
   SANITATION: "SANITATION",
   QA: "QA",
+  // A floor supervisor: can do every lifecycle action, and can VIEW the admin
+  // fleet list and audit log — but cannot change any configuration.
+  MANAGER: "MANAGER",
   ADMIN: "ADMIN",
 } as const;
 
@@ -137,17 +140,39 @@ export function parseRoles(roles: string): Role[] {
     .filter((r): r is Role => r in ROLE);
 }
 
+// Lifecycle capabilities a manager holds implicitly.
+const MANAGER_IMPLIES: Role[] = [ROLE.OPERATOR, ROLE.SANITATION, ROLE.QA];
+
 export function hasRole(roles: string, role: Role): boolean {
   const parsed = parseRoles(roles);
   // Admins can perform every function (operator, sanitation, QA, admin).
   if (parsed.includes(ROLE.ADMIN)) return true;
+  // Managers cover the floor roles, but never admin.
+  if (parsed.includes(ROLE.MANAGER) && MANAGER_IMPLIES.includes(role)) return true;
   return parsed.includes(role);
 }
 
 // Who may open the admin panel: admins and QA.
 export function canAccessAdmin(roles: string): boolean {
   const parsed = parseRoles(roles);
+  return (
+    parsed.includes(ROLE.ADMIN) ||
+    parsed.includes(ROLE.QA) ||
+    parsed.includes(ROLE.MANAGER)
+  );
+}
+
+// Who may CHANGE configuration — add/edit/remove knives, manage employees,
+// and edit the advanced settings. Managers get a read-only admin panel.
+export function canManageConfig(roles: string): boolean {
+  const parsed = parseRoles(roles);
   return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.QA);
+}
+
+// Who may put a DAMAGED knife back into service after reviewing it.
+export function canReturnDamaged(roles: string): boolean {
+  const parsed = parseRoles(roles);
+  return parsed.includes(ROLE.ADMIN) || parsed.includes(ROLE.MANAGER);
 }
 
 // The capabilities a worker effectively has — admins get every function.
@@ -155,7 +180,10 @@ export function canAccessAdmin(roles: string): boolean {
 export function effectiveRoles(roles: string): Role[] {
   const parsed = parseRoles(roles);
   if (parsed.includes(ROLE.ADMIN)) {
-    return [ROLE.OPERATOR, ROLE.SANITATION, ROLE.QA, ROLE.ADMIN];
+    return [ROLE.OPERATOR, ROLE.SANITATION, ROLE.QA, ROLE.MANAGER, ROLE.ADMIN];
+  }
+  if (parsed.includes(ROLE.MANAGER)) {
+    return [...new Set([...MANAGER_IMPLIES, ...parsed])];
   }
   return parsed;
 }

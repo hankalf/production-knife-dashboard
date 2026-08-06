@@ -1,6 +1,6 @@
 import { getKnives } from "@/lib/data";
 import { getCurrentWorker } from "@/lib/session";
-import { effectiveRoles } from "@/lib/status";
+import { effectiveRoles, canManageConfig } from "@/lib/status";
 import KnifeBoard, { type KnifeDTO } from "@/components/KnifeBoard";
 import { Legend } from "@/components/Legend";
 
@@ -33,7 +33,12 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <KnifeBoard knives={dto} roles={roles} signedIn={true} />
+      <KnifeBoard
+        knives={dto}
+        roles={roles}
+        signedIn={true}
+        canConfigure={canManageConfig(worker?.roles ?? "")}
+      />
 
       <Legend />
     </div>

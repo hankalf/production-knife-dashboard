@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentWorker } from "@/lib/session";
-import { canAccessAdmin, ACTION_LABEL } from "@/lib/status";
+import { canAccessAdmin, canManageConfig, ACTION_LABEL } from "@/lib/status";
 import { getWorkers, getRecentEvents, getTeamsSettings, getLogoDataUrl, getKnives } from "@/lib/data";
 import { AdminPanel } from "@/components/AdminPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -43,6 +43,7 @@ export default async function AdminPage() {
       </div>
 
       <AdminPanel
+        canEdit={canManageConfig(worker.roles)}
         logoDataUrl={logoDataUrl}
         knives={knives.map((k) => ({ id: k.id, number: k.number, type: k.type, status: k.status }))}
         system={{

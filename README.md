@@ -4,7 +4,7 @@ A tablet-first web app for tracking pre-numbered food-production safety knives t
 their full lifecycle: **operator checkout → sanitation cleaning & inspection → back in
 service**. A knife kept out past its due date is flagged overdue. Every action is recorded
 for food-safety auditing. Day-to-day the app runs in **kiosk mode on a shared iPad**; the
-management board and admin panel are for admins and QA only.
+management board and admin panel are for admins, QA, and managers.
 
 ## Lifecycle
 
@@ -15,7 +15,7 @@ AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)�
    │                                                                    ▼
    └───── condition GOOD ◀──────────────── 4-question checklist ──────▶ DAMAGED
                                                                          │
-                          manager (admin) returns to service ◀──────────┘
+                       manager/admin returns to service ◀─────────────┘
 ```
 
 Before a used knife goes back in service, **sanitation answers a 4-question checklist**
@@ -28,8 +28,8 @@ Before a used knife goes back in service, **sanitation answers a 4-question chec
    downscaled on-device)
 
 A **Good** knife (cleaned **and** inspected) returns straight to service. A **Damaged** knife
-moves to a **DAMAGED** state with the reported reason and photo, and **only a manager (admin)**
-can return it to service from the board (where the manager sees the reason and photo).
+moves to a **DAMAGED** state with the reported reason and photo, and **only a manager or admin**
+can return it to service from the board (where they see the reason and photo).
 
 - **Overdue** is derived (a checked-out knife past its due date), shown in red with a banner.
 - **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
@@ -60,10 +60,12 @@ back**. Set the type when adding a knife, or change it later from the knife's ac
 |------|--------|
 | Operator | Check out an available knife; return **their own** checked-out knife after use (kiosk only) |
 | Sanitation | Clean & inspect used (dirty) knives via the checklist, returning good ones to service |
-| QA | Supervisory role with fleet-board and admin-panel access |
-| Admin (manager) | **Everything** — all operator/sanitation functions, return **damaged** knives to service, plus add knives, retire/restore, manage workers & PINs, upload the kiosk logo, configure Teams alerts, and export the audit log |
+| QA | Supervisory role with fleet-board and full admin-panel access |
+| **Manager** | Floor supervisor: does every **operator, sanitation, and QA** job, reviews **damaged** knives, and can **view** the knife fleet + audit log — but the admin panel is **read-only** (no Add a knife, Workers, or Advanced, and no editing knives) |
+| Admin | **Everything** — all of the above plus add knives, retire/restore, manage workers & PINs, upload the kiosk logo, configure Teams alerts, and export the audit log |
 
-A worker can hold multiple roles, and **admins implicitly have every capability**. Only the
+A worker can hold multiple roles. **Admins implicitly have every capability**, and a
+**manager** implicitly holds the operator, sanitation, and QA capabilities. Only the
 operator who checked a knife out (or an admin) can return it, so returns are attributed to the
 right person.
 
@@ -75,10 +77,10 @@ surfaces are gated very differently:
 - **`/kiosk`** — open to everyone, no sign-in. Employees tap a knife and confirm each action
   with their PIN. This is the everyday floor surface.
 - The **management board (`/`)**, reports, knife history, and the **admin panel (`/admin`)**
-  are restricted to **admins and QA**. Visiting them shows a **full-screen PIN sign-in**; a
-  worker who signs in without the admin/QA role is told the area is kiosk-only and pointed
-  back to the kiosk.
-- Once an admin or QA is signed in on the board, opening the **Admin** tab needs **no second
+  are restricted to **admins, QA, and managers** (managers get a read-only admin panel).
+  Visiting them shows a **full-screen PIN sign-in**; a worker without one of those roles is
+  told the area is kiosk-only and pointed back to the kiosk.
+- Once an admin, QA, or manager is signed in on the board, opening the **Admin** tab needs **no second
   PIN** — the existing session carries through.
 
 ## Screens

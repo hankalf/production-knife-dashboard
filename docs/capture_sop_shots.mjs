@@ -158,6 +158,25 @@ try {
   await a.waitForTimeout(400);
   await shot(a.locator("details").first(), "admin-advanced");
   await a.close();
+
+  // ---------- What a manager sees on the same page ----------
+  const { hashPin } = await import("../src/lib/crypto.ts").catch(() => ({ hashPin: null }));
+  if (hashPin) {
+    await prisma.worker.deleteMany({ where: { name: "Morgan (Manager)" } });
+    await prisma.worker.create({
+      data: { name: "Morgan (Manager)", pin: hashPin("4444"), roles: "MANAGER", active: true },
+    });
+    const g = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, timezoneId: TZID });
+    await g.goto(BASE, { waitUntil: "networkidle" });
+    await enterPin(g, "4444");
+    await g.getByRole("button", { name: "Enter" }).click();
+    await g.waitForTimeout(900);
+    await g.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+    await g.waitForTimeout(600);
+    await shot(g, "admin-manager", { clip: { x: 0, y: 0, width: 1280, height: 900 } });
+    await g.close();
+    await prisma.worker.deleteMany({ where: { name: "Morgan (Manager)" } });
+  }
   console.log("screenshots written to docs/img/");
 } finally {
   await browser.close();

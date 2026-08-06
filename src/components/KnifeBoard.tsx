@@ -62,10 +62,15 @@ export default function KnifeBoard({
   knives,
   roles,
   signedIn,
+  canConfigure,
 }: {
   knives: KnifeDTO[];
   roles: string[];
   signedIn: boolean;
+  // Whether this worker may change configuration (knife type). Managers hold
+  // QA lifecycle powers but are read-only for configuration, so this is passed
+  // separately rather than derived from `roles`.
+  canConfigure: boolean;
 }) {
   const router = useRouter();
   // A ticking clock so overdue flips live without a server round-trip.
@@ -274,6 +279,7 @@ export default function KnifeBoard({
           state={selectedState}
           roles={roles}
           signedIn={signedIn}
+          canConfigure={canConfigure}
           onClose={() => setSelectedId(null)}
           onDone={() => {
             setSelectedId(null);
@@ -320,6 +326,7 @@ function KnifeModal({
   state,
   roles,
   signedIn,
+  canConfigure,
   onClose,
   onDone,
   fmt,
@@ -328,6 +335,7 @@ function KnifeModal({
   state: DisplayState;
   roles: string[];
   signedIn: boolean;
+  canConfigure: boolean;
   onClose: () => void;
   onDone: () => void;
   fmt: (ms: number | null) => string;
@@ -346,6 +354,9 @@ function KnifeModal({
 
   const is = knife.status;
   const has = (r: string) => roles.includes(r);
+  // Managers review damaged knives; changing a knife's type is an edit, so it
+  // stays with admins and QA.
+  const canReview = has("ADMIN") || has("MANAGER");
 
   return (
     <div
@@ -455,7 +466,7 @@ function KnifeModal({
               </ActionButton>
             )}
 
-            {is === "DAMAGED" && has("ADMIN") && (
+            {is === "DAMAGED" && canReview && (
               <ActionButton
                 pending={pending}
                 onClick={() => run(() => returnDamagedToService(knife.id))}
@@ -464,9 +475,9 @@ function KnifeModal({
                 Return to service (manager)
               </ActionButton>
             )}
-            {is === "DAMAGED" && !has("ADMIN") && (
+            {is === "DAMAGED" && !canReview && (
               <p className="text-xs text-slate-500">
-                Only a manager (admin) can return a damaged knife to service.
+                Only a manager or admin can return a damaged knife to service.
               </p>
             )}
 
@@ -489,7 +500,7 @@ function KnifeModal({
               </ActionButton>
             )}
 
-            {(has("ADMIN") || has("QA")) && (
+            {canConfigure && (
               <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Knife type</div>
                 <div className="flex gap-2">
