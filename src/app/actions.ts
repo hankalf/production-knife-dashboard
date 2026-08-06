@@ -777,7 +777,29 @@ function teamsPayload(webhookUrl: string, text: string): unknown {
   };
 }
 
+// Catch obviously-wrong URLs before posting, with a message that says what to
+// paste instead. A Teams *channel link* is the most common mistake — POSTing
+// to it returns HTTP 405 because it's a web page, not a webhook.
+function teamsUrlProblem(webhookUrl: string): string | null {
+  let host = "";
+  try {
+    host = new URL(webhookUrl).hostname.toLowerCase();
+  } catch {
+    return "That doesn't look like a valid URL.";
+  }
+  if (host === "teams.microsoft.com" || host.endsWith(".teams.microsoft.com")) {
+    return (
+      "That's a link to the Teams channel itself, not a webhook. In Teams: channel → ⋯ → " +
+      "Workflows → “Post to a channel when a webhook request is received” → copy the URL it " +
+      "gives you (it contains logic.azure.com)."
+    );
+  }
+  return null;
+}
+
 async function postToTeams(webhookUrl: string, text: string): Promise<string | null> {
+  const problem = teamsUrlProblem(webhookUrl);
+  if (problem) return problem;
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
@@ -785,6 +807,13 @@ async function postToTeams(webhookUrl: string, text: string): Promise<string | n
       body: JSON.stringify(teamsPayload(webhookUrl, text)),
     });
     if (!res.ok) {
+      if (res.status === 405) {
+        return (
+          "Teams returned HTTP 405 — that URL doesn't accept messages, so it isn't a webhook. " +
+          "Create one in Teams: channel → ⋯ → Workflows → “Post to a channel when a webhook " +
+          "request is received”, then paste the URL it generates (contains logic.azure.com)."
+        );
+      }
       const detail = (await res.text().catch(() => "")).slice(0, 300).trim();
       return `Teams returned HTTP ${res.status}${detail ? ` — ${detail}` : ""}.`;
     }
@@ -818,6 +847,8 @@ export async function updateTeamsSettings(input: {
   const url = (input.webhookUrl || "").trim();
   if (input.enabled) {
     if (!/^https:\/\/\S+$/.test(url)) return fail("Enter a valid https Teams webhook URL.");
+    const problem = teamsUrlProblem(url);
+    if (problem) return fail(problem);
     if (!input.notifyDamaged && !input.notifyOverdue) {
       return fail("Choose at least one thing to be notified about.");
     }
