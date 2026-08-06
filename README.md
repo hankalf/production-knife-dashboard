@@ -29,7 +29,7 @@ Before a used knife goes back in service, **sanitation answers a 4-question chec
 
 A **Good** knife (cleaned **and** inspected) returns straight to service. A **Damaged** knife
 moves to a **DAMAGED** state with the reported reason and photo, and **only a manager or admin**
-can return it to service from the board (where they see the reason and photo).
+can return it to service from the board — **QA, a manager, or an admin** (where they see the reason and photo).
 
 - **Overdue** is derived (a checked-out knife past its due date), shown in red with a banner.
 - **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
@@ -60,9 +60,9 @@ back**. Set the type when adding a knife, or change it later from the knife's ac
 |------|--------|
 | Operator | Check out an available knife; return **their own** checked-out knife after use (kiosk only) |
 | Sanitation | Clean & inspect used (dirty) knives via the checklist, returning good ones to service |
-| QA | Supervisory role with fleet-board and full admin-panel access |
+| QA | Fleet board, reports, and admin panel: manages **knives** and the kiosk logo, and can return **damaged** knives to service — but **not** employees or Teams settings |
 | **Manager** | Floor supervisor: does every **operator, sanitation, and QA** job, reviews **damaged** knives, and can **view** the knife fleet + audit log — but the admin panel is **read-only** (no Add a knife, Workers, or Advanced, and no editing knives) |
-| Admin | **Everything** — all of the above plus add knives, retire/restore, manage workers & PINs, upload the kiosk logo, configure Teams alerts, and export the audit log |
+| Admin | **Everything** — all of the above plus **manage employees & PINs** (add/edit/bulk-upload/remove) and **configure Teams alerts** |
 
 A worker can hold multiple roles. **Admins implicitly have every capability**, and a
 **manager** implicitly holds the operator, sanitation, and QA capabilities. Only the

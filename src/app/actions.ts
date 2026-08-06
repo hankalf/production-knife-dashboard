@@ -17,6 +17,8 @@ import {
   hasRole,
   canAccessAdmin,
   canManageConfig,
+  canManageWorkers,
+  canManageTeams,
   canReturnDamaged,
   type Role,
 } from "@/lib/status";
@@ -104,6 +106,30 @@ async function requireConfigAccess(): Promise<
       ok: false,
       error: "Managers have read-only access — ask an admin to make this change.",
     };
+  }
+  return { ok: true, workerId: worker.id, roles: worker.roles };
+}
+
+// Employee management is admin-only.
+async function requireWorkerAdmin(): Promise<
+  { ok: true; workerId: number; roles: string } | { ok: false; error: string }
+> {
+  const worker = await getCurrentWorker();
+  if (!worker) return { ok: false, error: "Sign in with your PIN first." };
+  if (!canManageWorkers(worker.roles)) {
+    return { ok: false, error: "Only an admin can manage employees." };
+  }
+  return { ok: true, workerId: worker.id, roles: worker.roles };
+}
+
+// Teams notification settings are admin-only.
+async function requireTeamsAdmin(): Promise<
+  { ok: true; workerId: number; roles: string } | { ok: false; error: string }
+> {
+  const worker = await getCurrentWorker();
+  if (!worker) return { ok: false, error: "Sign in with your PIN first." };
+  if (!canManageTeams(worker.roles)) {
+    return { ok: false, error: "Only an admin can change Teams notification settings." };
   }
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
@@ -435,7 +461,7 @@ export async function returnDamagedToService(knifeId: number): Promise<ActionRes
   const worker = await getCurrentWorker();
   if (!worker) return fail("Sign in with your PIN first.");
   if (!canReturnDamaged(worker.roles)) {
-    return fail("Only a manager or admin can return a damaged knife to service.");
+    return fail("Only QA, a manager, or an admin can return a damaged knife to service.");
   }
   const auth = { ok: true as const, workerId: worker.id, roles: worker.roles };
   return applyTransition(
@@ -699,7 +725,7 @@ export async function addWorker(
   pin: string,
   roles: string[]
 ): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireWorkerAdmin();
   if (!auth.ok) return fail(auth.error);
   const cleanName = (name || "").trim();
   const cleanPin = (pin || "").trim();
@@ -736,7 +762,7 @@ export async function setWorkerActive(
   workerId: number,
   active: boolean
 ): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireWorkerAdmin();
   if (!auth.ok) return fail(auth.error);
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
   if (!target) return fail("Worker not found.");
@@ -752,7 +778,7 @@ export async function updateWorker(
   workerId: number,
   input: { name: string; roles: string[]; pin?: string }
 ): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireWorkerAdmin();
   if (!auth.ok) return fail(auth.error);
 
   const cleanName = (input.name || "").trim();
@@ -790,7 +816,7 @@ export async function updateWorker(
 }
 
 export async function deleteWorker(workerId: number): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireWorkerAdmin();
   if (!auth.ok) return fail(auth.error);
 
   const target = await prisma.worker.findUnique({ where: { id: workerId } });
@@ -928,7 +954,7 @@ export async function updateTeamsSettings(input: {
   notifyCheckin: boolean;
   notifyCleaned: boolean;
 }): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireTeamsAdmin();
   if (!auth.ok) return fail(auth.error);
   const url = (input.webhookUrl || "").trim();
   if (input.enabled) {
@@ -963,7 +989,7 @@ export async function updateTeamsSettings(input: {
 
 // Send a test message so an admin can confirm the webhook works.
 export async function sendTeamsTest(): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireTeamsAdmin();
   if (!auth.ok) return fail(auth.error);
   const cfg = await getTeamsConfig();
   if (!cfg.webhookUrl) return fail("Add a webhook URL first.");
@@ -1002,7 +1028,7 @@ export type BulkResult = { ok: boolean; added: number; skipped: number; errors: 
 // Parse a CSV of "name,pin,roles" (roles separated by ; | or space) and create
 // the workers. Header row optional. Existing/duplicate PINs are skipped.
 export async function bulkAddWorkers(csv: string): Promise<BulkResult> {
-  const auth = await requireConfigAccess();
+  const auth = await requireWorkerAdmin();
   if (!auth.ok) return { ok: false, added: 0, skipped: 0, errors: [auth.error] };
 
   const lines = (csv || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
