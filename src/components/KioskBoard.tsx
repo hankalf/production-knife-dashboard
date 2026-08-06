@@ -206,24 +206,25 @@ export default function KioskBoard({
               )} ${STATUS_META[state].ring} ${locked ? "cursor-default" : ""}`}
               title={`#${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
-              <span className="leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}>
-                #{k.number}
-              </span>
-              <span
-                className="w-full px-0.5 text-center font-bold uppercase tracking-tight leading-[1.05]"
-                style={{ fontSize: "clamp(0.45rem, 1.7vmin, 1rem)" }}
-              >
-                {TYPE_META[normalizeType(k.type)].label}
-              </span>
-              {/* who has it checked out */}
+              {/* who has it checked out — pinned to the top of the card */}
               {k.status === "CHECKED_OUT" && k.holderName && (
                 <span
-                  className="mt-0.5 w-full truncate px-1 text-center font-medium leading-tight"
+                  className="absolute inset-x-0 top-0 truncate rounded-t px-1 py-0.5 text-center font-semibold bg-black/25 leading-tight"
                   style={{ fontSize: "clamp(0.45rem, 1.5vmin, 0.85rem)" }}
                 >
                   {shortName(k.holderName)}
                 </span>
-            )}
+              )}
+              <span className="leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4vmin, 3rem)" }}>
+                #{k.number}
+              </span>
+              {/* knife type — pinned to the bottom of the card */}
+              <span
+                className="absolute inset-x-0 bottom-0 px-0.5 py-0.5 text-center font-bold uppercase tracking-tight leading-[1.05]"
+                style={{ fontSize: "clamp(0.45rem, 1.7vmin, 1rem)" }}
+              >
+                {TYPE_META[normalizeType(k.type)].label}
+              </span>
             </button>
           ))}
         </div>

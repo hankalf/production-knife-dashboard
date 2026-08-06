@@ -35,6 +35,14 @@ export type KnifeDTO = {
   damagePhoto: string | null;
 };
 
+// Tiles are filled by knife TYPE (blue Food Contact / silver Non-Food Contact)
+// and ringed by lifecycle STATUS — matching the kiosk board.
+function typeTile(type: string): string {
+  return normalizeType(type) === "NFC"
+    ? "bg-slate-300 text-slate-900"
+    : "bg-blue-600 text-white";
+}
+
 function computeDisplayState(k: KnifeDTO, now: number): DisplayState {
   if (k.status === "CHECKED_OUT" && k.dueAtMs && k.dueAtMs < now) return "OVERDUE";
   return k.status as DisplayState;
@@ -206,19 +214,17 @@ export default function KnifeBoard({
               onClick={() =>
                 eligible ? togglePicked(k.id) : batchMode ? undefined : setSelectedId(k.id)
               }
-              className={`relative aspect-square rounded-lg border-2 flex flex-col items-center justify-center font-bold text-xs sm:text-sm md:text-base transition ${
-                STATUS_META[state].tile
-              } ${batchMode && !eligible ? "opacity-40" : ""} ${
+              className={`relative aspect-square rounded-lg border-[3px] flex flex-col items-center justify-center gap-0.5 font-bold text-xs sm:text-sm md:text-base transition ${typeTile(
+                k.type
+              )} ${STATUS_META[state].ring} ${batchMode && !eligible ? "opacity-40" : ""} ${
                 isPicked ? "ring-4 ring-offset-2 ring-slate-900" : ""
               }`}
               title={`Knife #${k.number} — ${STATUS_META[state].label} · ${TYPE_META[normalizeType(k.type)].label}`}
             >
-              <span
-                className={`absolute top-0.5 left-0.5 rounded px-1 leading-tight text-[9px] sm:text-[10px] font-bold ${TYPE_META[normalizeType(k.type)].badge}`}
-              >
-                {TYPE_META[normalizeType(k.type)].short}
+              <span className="leading-none">#{k.number}</span>
+              <span className="w-full px-0.5 text-center text-[8px] sm:text-[9px] font-bold uppercase leading-[1.05]">
+                {TYPE_META[normalizeType(k.type)].label}
               </span>
-              <span>#{k.number}</span>
               {isPicked && (
                 <span className="absolute top-1 right-1 bg-white text-slate-900 rounded-full w-5 h-5 text-xs flex items-center justify-center">
                   ✓
