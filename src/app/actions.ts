@@ -749,19 +749,48 @@ export async function deleteWorker(workerId: number): Promise<ActionResult> {
 
 // ---- Microsoft Teams notifications ----------------------------------------
 
-// POST a simple message to a Teams Incoming Webhook. Returns an error string
-// on failure, or null on success. Never throws.
+// POST a message to a Teams webhook. Returns an error string on failure, or
+// null on success. Never throws.
+//
+// Teams has two kinds of incoming webhook, which need different payloads:
+//  - Legacy "Incoming Webhook" connector (…webhook.office.com…) → { text }.
+//  - Power Automate "Workflows" webhook (…logic.azure.com…, the current
+//    Microsoft-recommended method) → an Adaptive Card wrapped in an
+//    attachments array. A { text } body posts nothing there.
+// We pick the shape from the URL so both work.
+function teamsPayload(webhookUrl: string, text: string): unknown {
+  const isLegacyConnector = /webhook\.office\.com/i.test(webhookUrl);
+  if (isLegacyConnector) return { text };
+  return {
+    type: "message",
+    attachments: [
+      {
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: {
+          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+          type: "AdaptiveCard",
+          version: "1.4",
+          body: [{ type: "TextBlock", text, wrap: true }],
+        },
+      },
+    ],
+  };
+}
+
 async function postToTeams(webhookUrl: string, text: string): Promise<string | null> {
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(teamsPayload(webhookUrl, text)),
     });
-    if (!res.ok) return `Teams returned HTTP ${res.status}.`;
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300).trim();
+      return `Teams returned HTTP ${res.status}${detail ? ` — ${detail}` : ""}.`;
+    }
     return null;
   } catch (e) {
-    return e instanceof Error ? e.message : "Could not reach Teams.";
+    return e instanceof Error ? `Could not reach Teams: ${e.message}` : "Could not reach Teams.";
   }
 }
 

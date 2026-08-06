@@ -519,9 +519,12 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
     <div>
       <h3 className="font-semibold mb-1">Microsoft Teams notifications</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        Paste an <strong>Incoming Webhook</strong> URL from your Teams channel. When a knife is
-        flagged <strong>damaged</strong>, a message is posted to that channel so a manager can
-        review it. (Overdue/scheduled alerts need a scheduled job — the damaged alert works now.)
+        Paste a webhook URL for your Teams channel — either a <strong>Workflows</strong> webhook
+        (Teams channel → ⋯ → Workflows → &quot;Post to a channel when a webhook request is
+        received&quot;; URL contains <code>logic.azure.com</code>) or a legacy{" "}
+        <strong>Incoming Webhook</strong> connector. Both formats are supported automatically.
+        When a knife is flagged <strong>damaged</strong>, a message is posted to that channel so a
+        manager can review it. Use <strong>Send test message</strong> to confirm the connection.
       </p>
 
       <label className="flex items-center gap-3 mb-3">
@@ -533,7 +536,7 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
       <input
         value={webhookUrl}
         onChange={(e) => setWebhookUrl(e.target.value)}
-        placeholder="https://<tenant>.webhook.office.com/webhookb2/…"
+        placeholder="https://….logic.azure.com/workflows/…  or  https://….webhook.office.com/…"
         className={`${INPUT} mb-3`}
       />
 
