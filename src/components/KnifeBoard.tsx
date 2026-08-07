@@ -35,12 +35,12 @@ export type KnifeDTO = {
   damagePhoto: string | null;
 };
 
-// Tiles are filled by knife TYPE (blue Food Contact / silver Non-Food Contact)
+// Tiles are filled by knife TYPE (silver Food Contact / blue Non-Food Contact)
 // and ringed by lifecycle STATUS — matching the kiosk board.
 function typeTile(type: string): string {
   return normalizeType(type) === "NFC"
-    ? "bg-slate-300 text-slate-900"
-    : "bg-blue-600 text-white";
+    ? "bg-blue-600 text-white"
+    : "bg-slate-300 text-slate-900";
 }
 
 function computeDisplayState(k: KnifeDTO, now: number): DisplayState {

@@ -40,12 +40,13 @@ async function seedState() {
   await prisma.worker.update({ where: { id: san.id }, data: { name: NAMES.sanitation } });
   await prisma.worker.update({ where: { id: qa.id }, data: { name: NAMES.qa } });
 
-  // Clean slate, then a realistic mix of states.
+  // Clean slate with the real fleet assignment: 1–14 FC, 51–78 NFC.
   await prisma.knife.updateMany({
-    data: { status: "AVAILABLE", type: "FC", checkedOutById: null, checkedOutAt: null, dueAt: null,
+    data: { status: "AVAILABLE", checkedOutById: null, checkedOutAt: null, dueAt: null,
             damageNote: null, damagePhoto: null },
   });
-  await prisma.knife.updateMany({ where: { number: { in: ["51", "52", "53"] } }, data: { type: "NFC" } });
+  await prisma.knife.updateMany({ where: { sortKey: { lte: 14 } }, data: { type: "FC" } });
+  await prisma.knife.updateMany({ where: { sortKey: { gte: 51 } }, data: { type: "NFC" } });
   // Show the Teams panel in its unconfigured state (placeholder URL, defaults).
   await prisma.setting.deleteMany({ where: { key: { startsWith: "teams." } } });
 
@@ -74,7 +75,7 @@ async function seedState() {
 
 async function restore(original) {
   await prisma.knife.updateMany({
-    data: { status: "AVAILABLE", type: "FC", checkedOutById: null, checkedOutAt: null, dueAt: null,
+    data: { status: "AVAILABLE", checkedOutById: null, checkedOutAt: null, dueAt: null,
             damageNote: null, damagePhoto: null },
   });
   const find = (n) => prisma.worker.findFirst({ where: { name: n } });

@@ -21,7 +21,7 @@ export function Legend() {
           <div key={t} className="flex items-center gap-2">
             <span
               className={`inline-block w-4 h-4 rounded ${
-                t === "NFC" ? "bg-slate-300 border border-slate-400" : "bg-blue-600"
+                t === "NFC" ? "bg-blue-600" : "bg-slate-300 border border-slate-400"
               }`}
             />
             <span>{TYPE_META[t].label}</span>

@@ -36,14 +36,15 @@ can return it to service from the board — **QA, a manager, or an admin** (wher
 
 ### Knife type & due dates
 
-Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**. The type drives the
+Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**. In this fleet,
+**#1–#14 are FC** and **#51–#78 are NFC** (the seed enforces this). The type drives the
 **due date** at checkout:
 
 - **FC** — checked out and returned the **same day**, due by end of shift (end of today).
 - **NFC** — signed out for the week (Mon–Fri), **due end of Friday**.
 
-On **both** the kiosk and the management board a tile is **filled by type** — blue for FC,
-silver for NFC, with the type spelled out — and **ringed by status**: green available, yellow
+On **both** the kiosk and the management board a tile is **filled by type** — silver/metal
+for FC, blue for NFC, with the type spelled out — and **ringed by status**: green available, yellow
 checked out, orange awaiting sanitation, red damaged, red + "OVERDUE" when past due. A
 checked-out tile also shows **who has it** (first name + last initial) and **when it's due
 back**. Set the type when adding a knife, or change it later from the knife's action modal
