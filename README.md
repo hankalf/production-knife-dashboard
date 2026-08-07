@@ -151,6 +151,7 @@ To run the whole app in containers instead, use the **`claude/docker-desktop`** 
 - `node docs/capture_sop_shots.mjs` — refresh the SOP screenshots (app must be running;
   set `PW_BASE_URL`, and `TZ` on the server so times look right)
 - `python3 docs/build_sop.py` — regenerate the SOP PDF (`docs/Safety-Knife-Checkout-SOP.pdf`)
+- `python3 docs/build_sop_es.py` — regenerate the Spanish SOP (`docs/Safety-Knife-Checkout-SOP-ES.pdf`)
 - `npm run build && npm start` — production build/run
 - `npx prisma studio` — inspect the database (knives, events, workers)
 
