@@ -4,15 +4,17 @@ import { hashPin } from "../src/lib/crypto";
 const prisma = new PrismaClient();
 
 // The current fleet: 42 knives labelled 1–14, 51–64, 65–78.
-function knifeNumbers(): number[] {
-  const ranges: [number, number][] = [
-    [1, 14],
-    [51, 64],
-    [65, 78],
+// 1–14 are Food Contact (returned daily); 51–78 are Non-Food Contact
+// (out for the week, due Friday).
+function knifeNumbers(): { n: number; type: "FC" | "NFC" }[] {
+  const ranges: [number, number, "FC" | "NFC"][] = [
+    [1, 14, "FC"],
+    [51, 64, "NFC"],
+    [65, 78, "NFC"],
   ];
-  const nums: number[] = [];
-  for (const [start, end] of ranges) {
-    for (let n = start; n <= end; n++) nums.push(n);
+  const nums: { n: number; type: "FC" | "NFC" }[] = [];
+  for (const [start, end, type] of ranges) {
+    for (let n = start; n <= end; n++) nums.push({ n, type });
   }
   return nums;
 }
@@ -27,12 +29,13 @@ const workers = [
 ];
 
 async function main() {
-  // Knives — idempotent upsert so re-seeding never duplicates.
-  for (const n of knifeNumbers()) {
+  // Knives — idempotent upsert so re-seeding never duplicates. The type is
+  // enforced on every run so the fleet's FC/NFC assignment stays correct.
+  for (const { n, type } of knifeNumbers()) {
     await prisma.knife.upsert({
       where: { number: String(n) },
-      update: {},
-      create: { number: String(n), sortKey: n, status: "AVAILABLE" },
+      update: { type },
+      create: { number: String(n), sortKey: n, status: "AVAILABLE", type },
     });
   }
 

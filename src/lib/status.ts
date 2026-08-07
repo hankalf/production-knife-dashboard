@@ -19,18 +19,20 @@ export const KNIFE_TYPE = {
 
 export type KnifeType = (typeof KNIFE_TYPE)[keyof typeof KNIFE_TYPE];
 
+// FC knives are silver/metal (returned daily); NFC knives are blue
+// (out for the week, due Friday).
 export const TYPE_META: Record<KnifeType, { label: string; short: string; badge: string; dot: string }> = {
   FC: {
     label: "Food Contact",
     short: "FC",
-    badge: "bg-blue-600 text-white",
-    dot: "bg-blue-600",
+    badge: "bg-slate-300 text-slate-800",
+    dot: "bg-slate-300 border border-slate-400",
   },
   NFC: {
     label: "Non-Food Contact",
     short: "NFC",
-    badge: "bg-slate-300 text-slate-800",
-    dot: "bg-slate-300 border border-slate-400",
+    badge: "bg-blue-600 text-white",
+    dot: "bg-blue-600",
   },
 };
 

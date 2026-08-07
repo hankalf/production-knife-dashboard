@@ -237,9 +237,9 @@ def build():
     s.append(table(
         [["Scope", "Checking out, returning, cleaning, and inspecting numbered "
                    "food-production safety knives."],
-         ["Applies to", "Operators, Sanitation, QA, and Managers (Admins)."],
+         ["Applies to", "Operators, Sanitation, QA, Managers, and Admins."],
          ["Everyday use", "The <b>kiosk</b> on the shared iPad (landscape). No sign-in required."],
-         ["Management", "Fleet board, Reports, and Admin panel — <b>admins and QA only</b>."],
+         ["Management", "Fleet board, Reports, and Admin panel — <b>admins, QA, and managers</b>."],
          ["Records", "Every action writes an immutable audit entry (who, what, when)."]],
         [1.25 * inch, W - 1.25 * inch], header=False, zebra=False))
     s.append(Spacer(1, 0.3 * inch))
@@ -317,8 +317,8 @@ def build():
         "The knife's type sets its due date automatically at checkout.")))
     s.append(table(
         [["Knife type", "Kiosk color", "Must be returned"],
-         ["<b>Food Contact (FC)</b>", "Blue tile", "<b>Same day</b>, by the end of the shift."],
-         ["<b>Non-Food Contact (NFC)</b>", "Silver tile", "<b>End of the week</b> — due Friday, end of shift."]],
+         ["<b>Food Contact (FC)</b> — knives #1–#14", "Silver/metal tile", "<b>Same day</b>, by the end of the shift."],
+         ["<b>Non-Food Contact (NFC)</b> — knives #51–#78", "Blue tile", "<b>End of the week</b> — due Friday, end of shift."]],
         [1.6 * inch, 1.1 * inch, W - 2.7 * inch]))
     s.append(Spacer(1, 8))
     s.append(P(
@@ -379,9 +379,10 @@ def build():
         [1.35 * inch, 1.4 * inch, W - 2.75 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure("kiosk-board",
-                    "Knife #2 and #6 are checked out (yellow, due today), #9 is overdue, "
-                    "#4 and #11 await sanitation (orange), #13 is damaged, and #51–#53 are "
-                    "Non-Food Contact (silver).", max_w=6.4 * inch, max_h=3.2 * inch))
+                    "Knife #2 and #6 are checked out (yellow ring, due today), #9 is overdue, "
+                    "#4 and #11 await sanitation (orange), and #13 is damaged. #1–#14 are "
+                    "Food Contact (silver); #51–#78 are Non-Food Contact (blue).",
+                    max_w=6.4 * inch, max_h=3.2 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
         "The counts along the top show how many knives are in each state. If anything "

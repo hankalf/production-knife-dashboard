@@ -444,8 +444,8 @@ function AddKnifeSection() {
             className={`flex-1 rounded-lg py-1.5 text-sm font-medium border ${
               type === t
                 ? t === "FC"
-                  ? "bg-blue-600 text-white border-transparent"
-                  : "bg-slate-300 text-slate-800 border-transparent"
+                  ? "bg-slate-300 text-slate-800 border-transparent"
+                  : "bg-blue-600 text-white border-transparent"
                 : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
             }`}
           >

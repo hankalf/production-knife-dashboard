@@ -25,12 +25,12 @@ function stateOf(k: KioskKnife, now: number): DisplayState {
   return k.status as DisplayState;
 }
 
-// Kiosk tiles are filled by knife TYPE: blue for Food Contact, silver for
+// Kiosk tiles are filled by knife TYPE: silver for Food Contact, blue for
 // Non-Food Contact. (Status is shown by the colored ring around the tile.)
 function typeTile(type: string): string {
   return normalizeType(type) === "NFC"
-    ? "bg-slate-300 text-slate-900"
-    : "bg-blue-600 text-white";
+    ? "bg-blue-600 text-white"
+    : "bg-slate-300 text-slate-900";
 }
 
 // Compact holder label for the small kiosk tile: "First L." Parentheticals
@@ -181,12 +181,12 @@ export default function KioskBoard({
       {/* Return policy per knife type */}
       <p className="text-xs lg:text-sm mb-2 flex flex-wrap gap-x-5 gap-y-0.5">
         <span>
-          <span className="font-semibold text-blue-400">Food Contact:</span>{" "}
+          <span className="font-semibold text-slate-200">Food Contact:</span>{" "}
           <span className="text-slate-300">return same day by end of shift</span>{" "}
           <span className="text-slate-500">· devolver el mismo día al final del turno</span>
         </span>
         <span>
-          <span className="font-semibold text-slate-300">Non-Food Contact:</span>{" "}
+          <span className="font-semibold text-blue-400">Non-Food Contact:</span>{" "}
           <span className="text-slate-300">out for the week — due Friday end of shift</span>{" "}
           <span className="text-slate-500">· vence el viernes al final del turno</span>
         </span>
